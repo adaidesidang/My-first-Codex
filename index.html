@@ -42,8 +42,8 @@
       <section id="devicePage" class="screen">
         <div class="glass-panel centered-panel">
           <p class="eyebrow">Before the arcade</p>
-          <h2>Choose your device.</h2>
-          <p class="panel-text">Desktop keeps the keyboard controls. Mobile adds touch arrows for phone and iPad.</p>
+          <h2 class="splash-title">Choose your device.<span class="version-splash">v1.0 power bean</span></h2>
+          <p class="panel-text">Click once to frame a device. Click it again to enter the arcade.</p>
           <div class="device-options">
             <button class="device-card" type="button" data-device="desktop">
               <span class="device-icon desktop-icon"></span>
@@ -62,6 +62,9 @@
 
       <section id="gameMenuPage" class="screen">
         <div class="menu-panel">
+          <button class="patch-button" id="patchNotesButton" type="button" aria-label="Open version notes">
+            <span></span>
+          </button>
           <div class="pac-icon" aria-hidden="true">
             <span></span>
           </div>
@@ -176,10 +179,13 @@
               <div class="scoreboard">
                 <span>Score</span>
                 <strong id="scoreValue">0</strong>
+                <small id="pelletProgress">Beans 0 / 0</small>
+                <small id="powerProgress">Power 0 / 0</small>
               </div>
               <div class="scoreboard">
                 <span>Ghosts</span>
                 <strong id="ghostCountValue">1</strong>
+                <div id="ghostEffects" class="ghost-effects"></div>
               </div>
             </div>
           </header>
@@ -188,7 +194,10 @@
             <div id="mobileControls" class="mobile-controls" aria-label="Mobile game controls">
               <button class="dpad-button dpad-up" type="button" data-move="up" aria-label="Move up">↑</button>
               <button class="dpad-button dpad-left" type="button" data-move="left" aria-label="Move left">←</button>
-              <button class="dpad-button dpad-center" type="button" aria-hidden="true"></button>
+              <button class="dpad-button dpad-center ability-button" id="mobileAbilityButton" type="button" aria-label="Use power bean">
+                <span class="power-bean-icon"></span>
+                <em id="mobilePowerCount">0</em>
+              </button>
               <button class="dpad-button dpad-right" type="button" data-move="right" aria-label="Move right">→</button>
               <button class="dpad-button dpad-down" type="button" data-move="down" aria-label="Move down">↓</button>
             </div>
@@ -240,6 +249,50 @@
   </div>
 
   <div class="watermark">adaidesidang</div>
+
+  <div id="patchModal" class="patch-modal" aria-hidden="true">
+    <div class="patch-card" role="dialog" aria-modal="true" aria-labelledby="patchTitle">
+      <button class="patch-close" id="patchCloseButton" type="button" aria-label="Close version notes">×</button>
+      <p class="eyebrow">Update Notes</p>
+      <h2 id="patchTitle">Version Log</h2>
+      <div class="patch-scroll">
+        <article class="patch-entry">
+          <header>
+            <h3>Version 1.1</h3>
+            <time>May 31, 2026</time>
+          </header>
+          <p>
+            Power phase time now scales by difficulty: two-ghost mode lasts 7.5s, and three-ghost mode lasts 8s.
+          </p>
+          <p>
+            One-ghost maps now have a 50 percent chance to include one power bean. Scoreboard power tracking,
+            device selection, and small gameplay details were polished.
+          </p>
+        </article>
+
+        <article class="patch-entry">
+          <header>
+            <h3>Version 1.0</h3>
+            <time>May 31, 2026</time>
+          </header>
+          <p>
+            A night-blue power bean now appears in harder mazes. Eat it, then press X on desktop
+            or tap the center mobile button to phase a nearby ghost.
+          </p>
+          <p>
+            The beam checks up to seven open tiles in the four straight directions. Walls block it.
+            A phased ghost turns misty, slows down, and drifts for seven seconds.
+          </p>
+          <div class="patch-demo" aria-label="Power bean example animation">
+            <span class="demo-pac"></span>
+            <span class="demo-beam"></span>
+            <span class="demo-ghost"></span>
+          </div>
+          <p class="patch-note">Two-ghost maps can hold 1-2 beans. Three-ghost maps can hold 2-3 beans.</p>
+        </article>
+      </div>
+    </div>
+  </div>
 
   <script src="script.js"></script>
 </body>

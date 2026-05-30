@@ -16,11 +16,20 @@ const historyStack = ["homePage"];
 const canvas = document.querySelector("#gameCanvas");
 const context = canvas.getContext("2d");
 const scoreValue = document.querySelector("#scoreValue");
+const pelletProgress = document.querySelector("#pelletProgress");
+const powerProgress = document.querySelector("#powerProgress");
 const ghostCountValue = document.querySelector("#ghostCountValue");
+const ghostEffects = document.querySelector("#ghostEffects");
 const gameModeLabel = document.querySelector("#gameModeLabel");
 const statusText = document.querySelector("#gameStatus");
 const resetButton = document.querySelector("#resetButton");
 const exitGameButton = document.querySelector("#exitGameButton");
+const patchNotesButton = document.querySelector("#patchNotesButton");
+const patchModal = document.querySelector("#patchModal");
+const patchCloseButton = document.querySelector("#patchCloseButton");
+const patchScroll = document.querySelector(".patch-scroll");
+const mobileAbilityButton = document.querySelector("#mobileAbilityButton");
+const mobilePowerCount = document.querySelector("#mobilePowerCount");
 const storyStartButton = document.querySelector("#storyStartButton");
 const leaderboardList = document.querySelector("#leaderboardList");
 const countdownNumber = document.querySelector("#countdownNumber");
@@ -40,6 +49,9 @@ const canvasHeight = canvas.height;
 const mapPadding = 28;
 const pacmanDelay = 211;
 const ghostDelay = 235;
+const basePhasedDuration = 7000;
+const powerRange = 7;
+const powerBeanColor = "#1d8cff";
 const ghostColors = ["blue", "red", "yellow"];
 const ghostColorValues = {
   blue: "#4db8ff",
@@ -62,6 +74,12 @@ let tileSize = 32;
 let offsetX = 0;
 let offsetY = 0;
 let pellets = new Set();
+let powerPellets = new Set();
+let totalPellets = 0;
+let totalPowerPellets = 0;
+let powerInventory = 0;
+let powerUsed = 0;
+let laserEffects = [];
 let score = 0;
 let gameRunning = false;
 let animationId = null;
@@ -76,6 +94,7 @@ let currentGhostCount = 1;
 let currentRunType = "Story";
 let storyLevel = 1;
 let selectedGhostCount = null;
+let selectedDeviceChoice = null;
 let selectedDevice = localStorage.getItem("miniPacDevice") || "desktop";
 let selectedSkin = localStorage.getItem("miniPacSkin") || "yellow";
 
@@ -106,6 +125,11 @@ function showScreen(screenId, addToHistory = true) {
     renderLeaderboard();
   }
 
+  if (screenId === "devicePage") {
+    selectedDeviceChoice = null;
+    deviceButtons.forEach((button) => button.classList.remove("selected"));
+  }
+
   if (screenId === "gamePage") {
     drawGame();
   }
@@ -133,8 +157,17 @@ document.querySelectorAll("[data-back]").forEach((button) => {
 
 deviceButtons.forEach((button) => {
   button.addEventListener("click", () => {
-    setDeviceMode(button.dataset.device);
-    showScreen("gameMenuPage");
+    const device = button.dataset.device;
+
+    if (selectedDeviceChoice === device && button.classList.contains("selected")) {
+      setDeviceMode(device);
+      showScreen("gameMenuPage");
+      return;
+    }
+
+    selectedDeviceChoice = device;
+    deviceButtons.forEach((item) => item.classList.remove("selected"));
+    button.classList.add("selected");
   });
 });
 
@@ -167,6 +200,29 @@ exitGameButton.addEventListener("click", () => {
   historyStack.length = 0;
   historyStack.push("homePage", "invitePage", "gameMenuPage");
   showScreen("gameMenuPage", false);
+});
+
+patchNotesButton.addEventListener("click", () => {
+  patchModal.classList.add("active");
+  patchModal.setAttribute("aria-hidden", "false");
+  patchScroll.scrollTop = 0;
+});
+
+patchCloseButton.addEventListener("click", () => {
+  patchModal.classList.remove("active");
+  patchModal.setAttribute("aria-hidden", "true");
+});
+
+patchModal.addEventListener("click", (event) => {
+  if (event.target === patchModal) {
+    patchModal.classList.remove("active");
+    patchModal.setAttribute("aria-hidden", "true");
+  }
+});
+
+mobileAbilityButton.addEventListener("pointerdown", (event) => {
+  event.preventDefault();
+  usePowerBean();
 });
 
 moveButtons.forEach((button) => {
@@ -251,6 +307,12 @@ function prepareGame(ghostCount, runType) {
   offsetY = (canvasHeight - currentMap.rows * tileSize) / 2;
 
   pellets = new Set();
+  powerPellets = new Set();
+  laserEffects = [];
+  totalPellets = 0;
+  totalPowerPellets = 0;
+  powerInventory = 0;
+  powerUsed = 0;
   score = 0;
   gameRunning = false;
   pacman = { ...currentMap.playerStart, mouth: 0 };
@@ -263,6 +325,9 @@ function prepareGame(ghostCount, runType) {
     color: ghostColors[index],
     direction: { x: index % 2 === 0 ? -1 : 1, y: 0 },
     memory: [],
+    timer: 0,
+    phasedUntil: 0,
+    wobble: 0,
   }));
 
   currentMap.rowsData.forEach((row, y) => {
@@ -272,11 +337,16 @@ function prepareGame(ghostCount, runType) {
       }
     });
   });
+  placePowerBeans();
+  totalPellets = pellets.size;
+  totalPowerPellets = powerPellets.size;
 
   updateScore();
   ghostCountValue.textContent = ghostCount;
   gameModeLabel.textContent = `${runType} / Map ${currentMapIndex + 1} / ${ghostCount} ${ghostCount === 1 ? "Ghost" : "Ghosts"}`;
-  statusText.textContent = "Use arrow keys or WASD. Clear every pearl.";
+  statusText.textContent = selectedDevice === "mobile"
+    ? "Use the arrows. Center button spends a power bean."
+    : "Use arrow keys or WASD. Press X to spend a power bean.";
   drawGame();
 }
 
@@ -296,6 +366,11 @@ function pauseGame(message = "") {
 
 function updateScore() {
   scoreValue.textContent = score;
+  pelletProgress.textContent = `Beans ${totalPellets - pellets.size} / ${totalPellets}`;
+  powerProgress.textContent = `Power ${powerInventory - powerUsed} / ${powerPellets.size} left`;
+  mobilePowerCount.textContent = powerInventory - powerUsed;
+  mobileAbilityButton.classList.toggle("ready", powerInventory - powerUsed > 0);
+  renderGhostEffects();
 }
 
 function shouldPlacePellet(x, y) {
@@ -349,61 +424,208 @@ function movePacman() {
     score += 10;
     updateScore();
   }
+
+  if (powerPellets.has(key)) {
+    powerPellets.delete(key);
+    powerInventory += 1;
+    score += 25;
+    statusText.textContent = selectedDevice === "mobile" ? "Power bean ready. Tap the center button." : "Power bean ready. Press X near a ghost.";
+    updateScore();
+  }
 }
 
-function moveGhosts() {
-  ghosts.forEach((ghost) => {
-    const options = [
-      { x: 1, y: 0 },
-      { x: -1, y: 0 },
-      { x: 0, y: 1 },
-      { x: 0, y: -1 },
-    ].filter((option) => canMove(ghost, option));
+function placePowerBeans() {
+  const target = currentGhostCount === 1
+    ? (Math.random() < 0.5 ? 1 : 0)
+    : currentGhostCount === 2
+    ? (Math.random() < 0.22 ? 2 : 1)
+    : (Math.random() < 0.2 ? 3 : 2);
 
-    if (options.length === 0) {
-      return;
-    }
+  if (target === 0) {
+    return;
+  }
 
-    const reverse = { x: -ghost.direction.x, y: -ghost.direction.y };
-    const forwardWorks = canMove(ghost, ghost.direction);
-    const filtered = options.filter((option) => option.x !== reverse.x || option.y !== reverse.y);
-    const choices = filtered.length > 0 ? filtered : options;
-    const shouldChoose = !forwardWorks || choices.length > 1 && Math.random() < 0.42;
-
-    if (shouldChoose) {
-      const ranked = choices
-        .map((option) => ({ option, distance: ghostDistance(ghost.x + option.x, ghost.y + option.y) }))
-        .sort((a, b) => a.distance - b.distance);
-
-      if (Math.random() < 0.58) {
-        ghost.direction = ranked[0].option;
-      } else {
-        ghost.direction = choices[Math.floor(Math.random() * choices.length)];
+  const deadEnds = [];
+  currentMap.rowsData.forEach((row, y) => {
+    row.split("").forEach((tile, x) => {
+      if (tile !== ".") {
+        return;
       }
-    }
 
-    ghost.x += ghost.direction.x;
-    ghost.y += ghost.direction.y;
-
-    const key = `${ghost.x},${ghost.y}`;
-    ghost.memory.push(key);
-    if (ghost.memory.length > 5) {
-      ghost.memory.shift();
-    }
-
-    if (ghost.memory.filter((value) => value === key).length >= 3) {
-      const escape = choices[Math.floor(Math.random() * choices.length)];
-      ghost.direction = escape;
-    }
+      const openNeighbors = getOpenDirections({ x, y });
+      const awayFromActors = Math.abs(x - pacman.x) + Math.abs(y - pacman.y) > 4
+        && ghosts.every((ghost) => Math.abs(x - ghost.x) + Math.abs(y - ghost.y) > 4);
+      if (openNeighbors.length === 1 && awayFromActors) {
+        deadEnds.push({ x, y });
+      }
+    });
   });
+
+  shuffle(deadEnds).slice(0, target).forEach((cell) => {
+    const key = `${cell.x},${cell.y}`;
+    powerPellets.add(key);
+  });
+}
+
+function getOpenDirections(position) {
+  return [
+    { x: 1, y: 0 },
+    { x: -1, y: 0 },
+    { x: 0, y: 1 },
+    { x: 0, y: -1 },
+  ].filter((option) => canMove(position, option));
+}
+
+function moveGhost(ghost) {
+  const options = getOpenDirections(ghost);
+
+  if (options.length === 0) {
+    return;
+  }
+
+  const phased = isGhostPhased(ghost);
+  const reverse = { x: -ghost.direction.x, y: -ghost.direction.y };
+  const forwardWorks = canMove(ghost, ghost.direction);
+  const filtered = options.filter((option) => option.x !== reverse.x || option.y !== reverse.y);
+  const choices = filtered.length > 0 ? filtered : options;
+  const shouldChoose = !forwardWorks || choices.length > 1 && Math.random() < (phased ? 0.7 : 0.42);
+
+  if (shouldChoose) {
+    const ranked = choices
+      .map((option) => ({ option, distance: ghostDistance(ghost.x + option.x, ghost.y + option.y) }))
+      .sort((a, b) => a.distance - b.distance);
+
+    if (phased) {
+      ghost.direction = Math.random() < 0.46
+        ? ranked[ranked.length - 1].option
+        : ranked[0].option;
+      ghost.wobble += 1;
+    } else if (Math.random() < 0.58) {
+      ghost.direction = ranked[0].option;
+    } else {
+      ghost.direction = choices[Math.floor(Math.random() * choices.length)];
+    }
+  }
+
+  ghost.x += ghost.direction.x;
+  ghost.y += ghost.direction.y;
+
+  const key = `${ghost.x},${ghost.y}`;
+  ghost.memory.push(key);
+  if (ghost.memory.length > 5) {
+    ghost.memory.shift();
+  }
+
+  if (ghost.memory.filter((value) => value === key).length >= 3) {
+    ghost.direction = choices[Math.floor(Math.random() * choices.length)];
+  }
+}
+
+function getGhostMoveDelay(ghost) {
+  if (isGhostPhased(ghost)) {
+    return ghostDelay / 0.3;
+  }
+
+  if (currentGhostCount === 3) {
+    return ghostDelay / 0.9;
+  }
+
+  return ghostDelay;
 }
 
 function ghostDistance(x, y) {
   return Math.abs(x - pacman.x) + Math.abs(y - pacman.y);
 }
 
+function isGhostPhased(ghost) {
+  return ghost.phasedUntil > performance.now();
+}
+
+function getPhasedDuration() {
+  if (currentGhostCount === 3) {
+    return basePhasedDuration + 1000;
+  }
+
+  if (currentGhostCount === 2) {
+    return basePhasedDuration + 500;
+  }
+
+  return basePhasedDuration;
+}
+
+function usePowerBean() {
+  if (!gameRunning || powerInventory - powerUsed <= 0) {
+    return;
+  }
+
+  const target = findPowerTarget();
+  if (!target) {
+    statusText.textContent = "No ghost is in a clear power line.";
+    return;
+  }
+
+  const now = performance.now();
+  if (isGhostPhased(target)) {
+    return;
+  }
+
+  powerUsed += 1;
+  const duration = getPhasedDuration();
+  target.phaseDuration = duration;
+  target.phasedUntil = now + duration;
+  target.timer = 0;
+  target.wobble = 0;
+  laserEffects.push({
+    from: { x: pacman.x, y: pacman.y },
+    to: { x: target.x, y: target.y },
+    startedAt: now,
+  });
+  statusText.textContent = `${target.color[0].toUpperCase()}${target.color.slice(1)} ghost phased for ${duration / 1000}s.`;
+  updateScore();
+}
+
+function findPowerTarget() {
+  const candidates = ghosts
+    .filter((ghost) => !isGhostPhased(ghost))
+    .map((ghost) => ({ ghost, distance: lineDistanceToGhost(ghost) }))
+    .filter((item) => item.distance > 0 && item.distance <= powerRange)
+    .sort((a, b) => a.distance - b.distance);
+
+  return candidates[0] ? candidates[0].ghost : null;
+}
+
+function lineDistanceToGhost(ghost) {
+  const sameColumn = ghost.x === pacman.x;
+  const sameRow = ghost.y === pacman.y;
+
+  if (!sameColumn && !sameRow) {
+    return Infinity;
+  }
+
+  const step = sameColumn
+    ? { x: 0, y: Math.sign(ghost.y - pacman.y) }
+    : { x: Math.sign(ghost.x - pacman.x), y: 0 };
+
+  if (step.x === 0 && step.y === 0) {
+    return 0;
+  }
+
+  for (let distance = 1; distance <= powerRange; distance += 1) {
+    const x = pacman.x + step.x * distance;
+    const y = pacman.y + step.y * distance;
+    if (!isOpen(x, y)) {
+      return Infinity;
+    }
+    if (ghost.x === x && ghost.y === y) {
+      return distance;
+    }
+  }
+
+  return Infinity;
+}
+
 function checkCollision() {
-  return ghosts.some((ghost) => ghost.x === pacman.x && ghost.y === pacman.y);
+  return ghosts.some((ghost) => ghost.x === pacman.x && ghost.y === pacman.y && !isGhostPhased(ghost));
 }
 
 function gameLoop(timestamp) {
@@ -414,7 +636,6 @@ function gameLoop(timestamp) {
   const delta = timestamp - lastFrameTime;
   lastFrameTime = timestamp;
   pacmanTimer += delta;
-  ghostTimer += delta;
 
   if (pacmanTimer >= pacmanDelay) {
     pacmanTimer = 0;
@@ -422,10 +643,17 @@ function gameLoop(timestamp) {
     pacman.mouth += 0.28;
   }
 
-  if (ghostTimer >= ghostDelay) {
-    ghostTimer = 0;
-    moveGhosts();
-  }
+  ghosts.forEach((ghost) => {
+    ghost.timer += delta;
+    const delay = getGhostMoveDelay(ghost);
+    if (ghost.timer >= delay) {
+      ghost.timer = 0;
+      moveGhost(ghost);
+    }
+  });
+
+  laserEffects = laserEffects.filter((effect) => timestamp - effect.startedAt < 420);
+  renderGhostEffects();
 
   if (checkCollision()) {
     finishGame(false);
@@ -517,6 +745,8 @@ function drawGame() {
   drawOcean();
   drawMaze();
   drawPellets();
+  drawPowerPellets();
+  drawLaserEffects();
   drawPacman();
   ghosts.forEach(drawGhost);
 }
@@ -531,13 +761,14 @@ function cellCenterY(y) {
 
 function drawOcean() {
   const gradient = context.createLinearGradient(0, 0, canvas.width, canvas.height);
-  gradient.addColorStop(0, "#081426");
-  gradient.addColorStop(0.5, "#073042");
-  gradient.addColorStop(1, "#090712");
+  gradient.addColorStop(0, "#07172b");
+  gradient.addColorStop(0.46, "#063c52");
+  gradient.addColorStop(0.78, "#121032");
+  gradient.addColorStop(1, "#080711");
   context.fillStyle = gradient;
   context.fillRect(0, 0, canvas.width, canvas.height);
 
-  context.strokeStyle = "rgba(67, 232, 216, 0.12)";
+  context.strokeStyle = "rgba(67, 232, 216, 0.18)";
   context.lineWidth = 2;
   for (let y = 34; y < canvas.height; y += 56) {
     context.beginPath();
@@ -558,7 +789,7 @@ function drawMaze() {
         const inset = Math.max(2, tileSize * 0.08);
         context.fillStyle = "rgba(10, 20, 31, 0.92)";
         context.fillRect(left + inset, top + inset, tileSize - inset * 2, tileSize - inset * 2);
-        context.strokeStyle = "rgba(67, 232, 216, 0.55)";
+        context.strokeStyle = "rgba(67, 232, 216, 0.68)";
         context.lineWidth = Math.max(1, tileSize * 0.045);
         context.strokeRect(left + inset * 1.6, top + inset * 1.6, tileSize - inset * 3.2, tileSize - inset * 3.2);
       }
@@ -576,6 +807,48 @@ function drawPellets() {
     context.arc(cellCenterX(x), cellCenterY(y), Math.max(2.2, tileSize * 0.12), 0, Math.PI * 2);
     context.fill();
     context.shadowBlur = 0;
+  });
+}
+
+function drawPowerPellets() {
+  const pulse = 0.75 + Math.sin(performance.now() / 180) * 0.25;
+  powerPellets.forEach((key) => {
+    const [x, y] = key.split(",").map(Number);
+    context.save();
+    context.translate(cellCenterX(x), cellCenterY(y));
+    context.beginPath();
+    context.fillStyle = powerBeanColor;
+    context.shadowColor = "rgba(29, 140, 255, 0.95)";
+    context.shadowBlur = 20;
+    context.arc(0, 0, Math.max(3.4, tileSize * 0.17) * pulse, 0, Math.PI * 2);
+    context.fill();
+    context.beginPath();
+    context.strokeStyle = "rgba(190, 233, 255, 0.7)";
+    context.lineWidth = Math.max(1, tileSize * 0.035);
+    context.arc(0, 0, Math.max(5, tileSize * 0.27), 0, Math.PI * 2);
+    context.stroke();
+    context.restore();
+  });
+  context.shadowBlur = 0;
+}
+
+function drawLaserEffects() {
+  const now = performance.now();
+  laserEffects.forEach((effect) => {
+    const age = now - effect.startedAt;
+    const opacity = Math.max(0, 1 - age / 420);
+    context.save();
+    context.strokeStyle = `rgba(116, 219, 255, ${0.34 * opacity})`;
+    context.lineWidth = Math.max(2, tileSize * 0.08);
+    context.shadowColor = "rgba(29, 140, 255, 0.65)";
+    context.shadowBlur = 16;
+    context.setLineDash([tileSize * 0.22, tileSize * 0.18]);
+    context.lineDashOffset = -age / 18;
+    context.beginPath();
+    context.moveTo(cellCenterX(effect.from.x), cellCenterY(effect.from.y));
+    context.lineTo(cellCenterX(effect.to.x), cellCenterY(effect.to.y));
+    context.stroke();
+    context.restore();
   });
 }
 
@@ -604,10 +877,13 @@ function drawGhost(ghost) {
   const height = tileSize * 0.72;
   const left = cellCenterX(ghost.x) - width / 2;
   const top = cellCenterY(ghost.y) - height / 2;
+  const phased = isGhostPhased(ghost);
 
-  context.fillStyle = ghostColorValues[ghost.color];
+  context.save();
+  context.globalAlpha = phased ? 0.52 : 1;
+  context.fillStyle = phased ? "rgba(238, 248, 255, 0.48)" : ghostColorValues[ghost.color];
   context.shadowColor = ghostColorValues[ghost.color];
-  context.shadowBlur = 14;
+  context.shadowBlur = phased ? 26 : 14;
   context.beginPath();
   context.arc(left + width / 2, top + width / 2, width / 2, Math.PI, 0);
   context.lineTo(left + width, top + height);
@@ -618,13 +894,50 @@ function drawGhost(ghost) {
   context.lineTo(left, top + width / 2);
   context.closePath();
   context.fill();
+
+  if (phased) {
+    context.setLineDash([tileSize * 0.14, tileSize * 0.11]);
+    context.lineDashOffset = -performance.now() / 70;
+    context.strokeStyle = "rgba(238, 248, 255, 0.8)";
+    context.lineWidth = Math.max(1, tileSize * 0.05);
+    context.stroke();
+    context.setLineDash([]);
+    drawDizzyHalo(left + width / 2, top - height * 0.12, width * 0.46);
+  }
+
   context.shadowBlur = 0;
 
   context.fillStyle = "#061014";
+  if (phased) {
+    drawDizzyEye(left + width * 0.34, top + height * 0.42, Math.max(2.5, tileSize * 0.07));
+    drawDizzyEye(left + width * 0.64, top + height * 0.42, Math.max(2.5, tileSize * 0.07));
+  } else {
+    context.beginPath();
+    context.arc(left + width * 0.34, top + height * 0.42, Math.max(1.6, tileSize * 0.05), 0, Math.PI * 2);
+    context.arc(left + width * 0.64, top + height * 0.42, Math.max(1.6, tileSize * 0.05), 0, Math.PI * 2);
+    context.fill();
+  }
+  context.restore();
+}
+
+function drawDizzyHalo(x, y, radius) {
+  context.save();
+  context.strokeStyle = "rgba(125, 255, 166, 0.9)";
+  context.lineWidth = Math.max(1, tileSize * 0.04);
   context.beginPath();
-  context.arc(left + width * 0.34, top + height * 0.42, Math.max(1.6, tileSize * 0.05), 0, Math.PI * 2);
-  context.arc(left + width * 0.64, top + height * 0.42, Math.max(1.6, tileSize * 0.05), 0, Math.PI * 2);
-  context.fill();
+  context.ellipse(x, y + Math.sin(performance.now() / 180) * 1.6, radius, radius * 0.34, 0, 0, Math.PI * 2);
+  context.stroke();
+  context.restore();
+}
+
+function drawDizzyEye(x, y, radius) {
+  context.save();
+  context.strokeStyle = "#061014";
+  context.lineWidth = Math.max(1, radius * 0.42);
+  context.beginPath();
+  context.arc(x, y, radius, 0, Math.PI * 1.75);
+  context.stroke();
+  context.restore();
 }
 
 function saveLeaderboardScore(finalScore, won) {
@@ -680,6 +993,27 @@ function renderLeaderboard() {
   });
 }
 
+function renderGhostEffects() {
+  ghostEffects.innerHTML = "";
+  const now = performance.now();
+  ghosts
+    .filter((ghost) => ghost.phasedUntil > now)
+    .forEach((ghost) => {
+      const remainingMs = Math.max(0, ghost.phasedUntil - now);
+      const remaining = Math.ceil(remainingMs / 1000);
+      const duration = ghost.phaseDuration || basePhasedDuration;
+      const percent = Math.max(0, Math.min(100, remainingMs / duration * 100));
+      const item = document.createElement("div");
+      item.className = "ghost-effect";
+      item.innerHTML = `
+        <span class="effect-ghost ${ghost.color}"></span>
+        <b>${remaining}s</b>
+        <i><span style="width:${percent}%"></span></i>
+      `;
+      ghostEffects.appendChild(item);
+    });
+}
+
 document.addEventListener("keydown", (event) => {
   const keyMap = {
     ArrowUp: { x: 0, y: -1 },
@@ -699,6 +1033,11 @@ document.addEventListener("keydown", (event) => {
   if (keyMap[event.key]) {
     event.preventDefault();
     nextDirection = keyMap[event.key];
+  }
+
+  if (event.key === "x" || event.key === "X") {
+    event.preventDefault();
+    usePowerBean();
   }
 });
 
