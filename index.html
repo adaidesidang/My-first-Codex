@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My First Website</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="site-shell">
+    <main>
+      <section id="homePage" class="screen active">
+        <div class="home-card">
+          <p class="eyebrow">Bonjour / Hello / 你好</p>
+          <h1>
+            <span>My</span>
+            <span>First</span>
+            <span>Website</span>
+          </h1>
+          <p class="summary">
+            A quiet digital space for ideas, code, and small beginnings.
+          </p>
+          <p class="note">Built with clarity. Styled with calm.</p>
+          <div class="actions">
+            <button class="primary-button" type="button" data-go="invitePage">Enter</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="invitePage" class="screen">
+        <div class="glass-panel centered-panel">
+          <p class="eyebrow">A small detour</p>
+          <h2>Do you want to play a little game?</h2>
+          <p class="panel-text">Un petit jeu by the sea, made for one quiet glowing screen.</p>
+          <div class="actions split-actions">
+            <button class="ghost-button" type="button" data-back>Back</button>
+            <button class="primary-button" type="button" data-go="gameMenuPage">Enter</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="gameMenuPage" class="screen">
+        <div class="menu-panel">
+          <div class="pac-icon" aria-hidden="true">
+            <span></span>
+          </div>
+          <p class="eyebrow">Seaside arcade</p>
+          <h2>Mini Pac</h2>
+          <nav class="vertical-menu" aria-label="Game menu">
+            <button type="button" id="storyStartButton">Start Game</button>
+            <button type="button" data-go="leaderboardPage">Leaderboard</button>
+            <button type="button" data-go="levelSelectPage">Select Level</button>
+            <button type="button" data-go="creditsPage">Credits</button>
+          </nav>
+          <button class="ghost-button lower-back" type="button" data-back>Back</button>
+        </div>
+      </section>
+
+      <section id="levelSelectPage" class="screen">
+        <div class="select-panel">
+          <p class="eyebrow">Manual mode</p>
+          <h2>Select Level</h2>
+          <p class="panel-text">Click once to frame a card. Click the same card again to begin.</p>
+          <div class="level-cards" aria-label="Select ghost count">
+            <button class="level-card" type="button" data-ghost-select="1">
+              <span class="level-art level-art-one">
+                <span class="mini-pac"></span>
+                <span class="mini-ghost blue"></span>
+              </span>
+              <strong>One Ghost</strong>
+            </button>
+            <button class="level-card" type="button" data-ghost-select="2">
+              <span class="level-art level-art-two">
+                <span class="mini-pac"></span>
+                <span class="mini-ghost blue"></span>
+                <span class="mini-ghost red"></span>
+              </span>
+              <strong>Two Ghosts</strong>
+            </button>
+            <button class="level-card" type="button" data-ghost-select="3">
+              <span class="level-art level-art-three">
+                <span class="mini-pac"></span>
+                <span class="mini-ghost red"></span>
+                <span class="mini-ghost blue"></span>
+                <span class="mini-ghost yellow"></span>
+              </span>
+              <strong>Three Ghosts</strong>
+            </button>
+          </div>
+          <div class="actions split-actions">
+            <button class="ghost-button" type="button" data-back>Back</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="countdownPage" class="screen">
+        <div class="countdown-panel">
+          <p class="eyebrow" id="countdownMode">Story mode</p>
+          <div id="countdownNumber" class="countdown-number">3</div>
+          <p class="panel-text">The tide is pulling the maze into place.</p>
+        </div>
+      </section>
+
+      <section id="gamePage" class="screen">
+        <div class="game-layout">
+          <header class="game-topbar">
+            <div>
+              <p class="eyebrow" id="gameModeLabel">Ocean maze</p>
+              <h2>Mini Pac</h2>
+            </div>
+            <div class="score-cluster">
+              <div class="scoreboard">
+                <span>Score</span>
+                <strong id="scoreValue">0</strong>
+              </div>
+              <div class="scoreboard">
+                <span>Ghosts</span>
+                <strong id="ghostCountValue">1</strong>
+              </div>
+            </div>
+          </header>
+          <canvas id="gameCanvas" width="800" height="600" aria-label="Pac-Man style game"></canvas>
+          <div class="game-controls">
+            <button class="ghost-button" type="button" data-back>Back</button>
+            <button class="ghost-button" id="exitGameButton" type="button">Exit to Main Page</button>
+            <button class="secondary-button" id="resetButton" type="button">Reset</button>
+          </div>
+          <p id="gameStatus" class="status-text">Use arrow keys or WASD.</p>
+        </div>
+      </section>
+
+      <section id="resultPage" class="screen">
+        <div class="result-panel">
+          <p class="eyebrow" id="resultKicker">Victory</p>
+          <h2 id="resultTitle">Beautiful run.</h2>
+          <div class="result-stage" id="resultStage" aria-hidden="true"></div>
+          <p id="resultSummary" class="panel-text"></p>
+          <div class="actions split-actions" id="resultActions"></div>
+        </div>
+      </section>
+
+      <section id="leaderboardPage" class="screen">
+        <div class="leaderboard-panel">
+          <p class="eyebrow">Best runs</p>
+          <h2>Leaderboard</h2>
+          <div id="leaderboardList" class="leaderboard-list"></div>
+          <div class="actions split-actions">
+            <button class="ghost-button" type="button" data-back>Back</button>
+            <button class="primary-button" type="button" data-go="gameMenuPage">Enter Menu</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="creditsPage" class="screen">
+        <div class="glass-panel centered-panel">
+          <p class="eyebrow">Credits</p>
+          <h2>Created by</h2>
+          <p class="credit-name">adaidesidang</p>
+          <p class="panel-text">Design, code, and seaside arcade mood.</p>
+          <div class="actions split-actions">
+            <button class="ghost-button" type="button" data-back>Back</button>
+            <button class="primary-button" type="button" data-go="gameMenuPage">Enter Menu</button>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="watermark">adaidesidang</div>
+
+  <script src="script.js"></script>
+</body>
+</html>
