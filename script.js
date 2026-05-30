@@ -3,6 +3,7 @@ const screens = {
   invitePage: document.querySelector("#invitePage"),
   devicePage: document.querySelector("#devicePage"),
   gameMenuPage: document.querySelector("#gameMenuPage"),
+  roleSelectPage: document.querySelector("#roleSelectPage"),
   levelSelectPage: document.querySelector("#levelSelectPage"),
   skinsPage: document.querySelector("#skinsPage"),
   countdownPage: document.querySelector("#countdownPage"),
@@ -21,6 +22,8 @@ const powerProgress = document.querySelector("#powerProgress");
 const ghostCountValue = document.querySelector("#ghostCountValue");
 const ghostEffects = document.querySelector("#ghostEffects");
 const gameModeLabel = document.querySelector("#gameModeLabel");
+const gameTimer = document.querySelector("#gameTimer");
+const teleportWarning = document.querySelector("#teleportWarning");
 const statusText = document.querySelector("#gameStatus");
 const resetButton = document.querySelector("#resetButton");
 const exitGameButton = document.querySelector("#exitGameButton");
@@ -31,7 +34,9 @@ const patchScroll = document.querySelector(".patch-scroll");
 const mobileAbilityButton = document.querySelector("#mobileAbilityButton");
 const mobilePowerCount = document.querySelector("#mobilePowerCount");
 const storyStartButton = document.querySelector("#storyStartButton");
+const selectModeButton = document.querySelector("#selectModeButton");
 const leaderboardList = document.querySelector("#leaderboardList");
+const leaderboardModeButtons = document.querySelectorAll("[data-leaderboard-mode]");
 const countdownNumber = document.querySelector("#countdownNumber");
 const countdownMode = document.querySelector("#countdownMode");
 const resultKicker = document.querySelector("#resultKicker");
@@ -40,9 +45,11 @@ const resultSummary = document.querySelector("#resultSummary");
 const resultActions = document.querySelector("#resultActions");
 const resultStage = document.querySelector("#resultStage");
 const levelCards = document.querySelectorAll("[data-ghost-select]");
+const roleCards = document.querySelectorAll("[data-role-select]");
 const deviceButtons = document.querySelectorAll("[data-device]");
 const moveButtons = document.querySelectorAll("[data-move]");
 const skinCards = document.querySelectorAll("[data-skin]");
+const ghostSkinCards = document.querySelectorAll("[data-ghost-skin]");
 
 const canvasWidth = canvas.width;
 const canvasHeight = canvas.height;
@@ -52,11 +59,14 @@ const ghostDelay = 235;
 const basePhasedDuration = 7000;
 const powerRange = 7;
 const powerBeanColor = "#1d8cff";
+const flashColor = "#f6d365";
 const ghostColors = ["blue", "red", "yellow"];
 const ghostColorValues = {
   blue: "#4db8ff",
   red: "#f07167",
   yellow: "#ffd166",
+  green: "#7bd88f",
+  violet: "#b983ff",
 };
 const skinColorValues = {
   red: "#ff4d6d",
@@ -75,30 +85,44 @@ let offsetX = 0;
 let offsetY = 0;
 let pellets = new Set();
 let powerPellets = new Set();
+let aiPowerPellets = new Set();
+let wormholes = [];
 let totalPellets = 0;
 let totalPowerPellets = 0;
 let powerInventory = 0;
 let powerUsed = 0;
 let laserEffects = [];
+let flashEffects = [];
+let teleportEffects = [];
 let score = 0;
+let gameStartTime = 0;
+let elapsedTime = 0;
+let ghostTimeLimit = 180000;
+let leaderboardMode = "pac";
 let gameRunning = false;
 let animationId = null;
 let lastFrameTime = 0;
 let pacmanTimer = 0;
 let ghostTimer = 0;
+let ghostStationaryMs = 0;
+let ghostLastPosition = null;
 let pacman = null;
 let ghosts = [];
 let direction = { x: 0, y: 0 };
 let nextDirection = { x: 0, y: 0 };
 let currentGhostCount = 1;
 let currentRunType = "Story";
+let currentRole = "pac";
+let pendingRunType = "Story";
 let storyLevel = 1;
 let threeGhostStreak = 0;
 let threeGhostDifficulty = 0;
 let selectedGhostCount = null;
+let selectedRoleChoice = null;
 let selectedDeviceChoice = null;
 let selectedDevice = localStorage.getItem("miniPacDevice") || "desktop";
 let selectedSkin = localStorage.getItem("miniPacSkin") || "yellow";
+let selectedGhostSkin = localStorage.getItem("miniPacGhostSkin") || "blue";
 
 const mapDecks = {
   1: createDeck(1),
@@ -130,6 +154,11 @@ function showScreen(screenId, addToHistory = true) {
   if (screenId === "devicePage") {
     selectedDeviceChoice = null;
     deviceButtons.forEach((button) => button.classList.remove("selected"));
+  }
+
+  if (screenId === "roleSelectPage") {
+    selectedRoleChoice = null;
+    roleCards.forEach((button) => button.classList.remove("selected"));
   }
 
   if (screenId === "gamePage") {
@@ -174,8 +203,34 @@ deviceButtons.forEach((button) => {
 });
 
 storyStartButton.addEventListener("click", () => {
-  storyLevel = 1;
-  startCountdown(1, "Story");
+  pendingRunType = "Story";
+  showScreen("roleSelectPage");
+});
+
+selectModeButton.addEventListener("click", () => {
+  pendingRunType = "Manual";
+  showScreen("roleSelectPage");
+});
+
+roleCards.forEach((card) => {
+  card.addEventListener("click", () => {
+    const role = card.dataset.roleSelect;
+
+    if (selectedRoleChoice === role && card.classList.contains("selected")) {
+      currentRole = role;
+      if (pendingRunType === "Manual") {
+        showScreen("levelSelectPage");
+      } else {
+        storyLevel = 1;
+        startCountdown(1, "Story", role);
+      }
+      return;
+    }
+
+    selectedRoleChoice = role;
+    roleCards.forEach((item) => item.classList.remove("selected"));
+    card.classList.add("selected");
+  });
 });
 
 levelCards.forEach((card) => {
@@ -183,7 +238,7 @@ levelCards.forEach((card) => {
     const ghostCount = Number(card.dataset.ghostSelect);
 
     if (selectedGhostCount === ghostCount && card.classList.contains("selected")) {
-      startCountdown(ghostCount, "Manual");
+      startCountdown(ghostCount, "Manual", currentRole);
       return;
     }
 
@@ -194,7 +249,7 @@ levelCards.forEach((card) => {
 });
 
 resetButton.addEventListener("click", () => {
-  startCountdown(currentGhostCount, currentRunType);
+  startCountdown(currentGhostCount, currentRunType, currentRole);
 });
 
 exitGameButton.addEventListener("click", () => {
@@ -224,7 +279,7 @@ patchModal.addEventListener("click", (event) => {
 
 mobileAbilityButton.addEventListener("pointerdown", (event) => {
   event.preventDefault();
-  usePowerBean();
+  useAbility();
 });
 
 moveButtons.forEach((button) => {
@@ -237,6 +292,20 @@ moveButtons.forEach((button) => {
 skinCards.forEach((card) => {
   card.addEventListener("click", () => {
     setSkin(card.dataset.skin);
+  });
+});
+
+ghostSkinCards.forEach((card) => {
+  card.addEventListener("click", () => {
+    setGhostSkin(card.dataset.ghostSkin);
+  });
+});
+
+leaderboardModeButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    leaderboardMode = button.dataset.leaderboardMode;
+    leaderboardModeButtons.forEach((item) => item.classList.toggle("active", item === button));
+    renderLeaderboard();
   });
 });
 
@@ -254,6 +323,16 @@ function setSkin(skin) {
   drawGame();
 }
 
+function setGhostSkin(skin) {
+  selectedGhostSkin = skin;
+  localStorage.setItem("miniPacGhostSkin", skin);
+  ghostSkinCards.forEach((card) => card.classList.toggle("selected", card.dataset.ghostSkin === skin));
+  if (currentRole === "ghost" && ghosts[0]) {
+    ghosts[0].color = selectedGhostSkin;
+    drawGame();
+  }
+}
+
 function setDirectionFromName(name) {
   const directions = {
     up: { x: 0, y: -1 },
@@ -267,11 +346,13 @@ function setDirectionFromName(name) {
   }
 }
 
-function startCountdown(ghostCount, runType) {
+function startCountdown(ghostCount, runType, role = currentRole) {
   pauseGame();
   currentGhostCount = ghostCount;
   currentRunType = runType;
-  countdownMode.textContent = `${runType} / ${ghostCount} ${ghostCount === 1 ? "Ghost" : "Ghosts"}`;
+  currentRole = role;
+  const roleLabel = role === "ghost" ? "Ghost Mode" : "Pac Mode";
+  countdownMode.textContent = `${roleLabel} / ${runType} / ${ghostCount} ${ghostCount === 1 ? "Ghost" : "Ghosts"}`;
   showScreen("countdownPage");
 
   let number = 3;
@@ -286,7 +367,7 @@ function startCountdown(ghostCount, runType) {
     clearInterval(timer);
     countdownNumber.textContent = "Go";
     setTimeout(() => {
-      prepareGame(ghostCount, runType);
+      prepareGame(ghostCount, runType, role);
       if (historyStack[historyStack.length - 1] === "countdownPage") {
         historyStack.pop();
       }
@@ -296,9 +377,10 @@ function startCountdown(ghostCount, runType) {
   }, 780);
 }
 
-function prepareGame(ghostCount, runType) {
+function prepareGame(ghostCount, runType, role = currentRole) {
   currentGhostCount = ghostCount;
   currentRunType = runType;
+  currentRole = role;
   if (ghostCount === 3) {
     threeGhostStreak += 1;
     threeGhostDifficulty = Math.min(Math.max(0, threeGhostStreak - 1) * 0.045, 0.18);
@@ -317,27 +399,38 @@ function prepareGame(ghostCount, runType) {
 
   pellets = new Set();
   powerPellets = new Set();
+  aiPowerPellets = new Set();
+  wormholes = [];
   laserEffects = [];
+  flashEffects = [];
+  teleportEffects = [];
   totalPellets = 0;
   totalPowerPellets = 0;
   powerInventory = 0;
   powerUsed = 0;
   score = 0;
+  elapsedTime = 0;
+  ghostTimeLimit = getGhostTimeLimit(ghostCount);
   gameRunning = false;
   pacman = { ...currentMap.playerStart, mouth: 0 };
   direction = { x: 0, y: 0 };
   nextDirection = { x: 0, y: 0 };
   pacmanTimer = 0;
   ghostTimer = 0;
+  ghostStationaryMs = 0;
+  ghostLastPosition = null;
   ghosts = currentMap.ghostStarts.slice(0, ghostCount).map((start, index) => ({
     ...start,
     index,
-    color: ghostColors[index],
+    color: role === "ghost" && index === 0 ? selectedGhostSkin : ghostColors[index],
     direction: { x: index % 2 === 0 ? -1 : 1, y: 0 },
     memory: [],
     timer: 0,
     phasedUntil: 0,
     pressureDumbUntil: 0,
+    flashUntil: 0,
+    flashEffectUntil: 0,
+    teleporting: null,
     wobble: 0,
   }));
 
@@ -348,21 +441,24 @@ function prepareGame(ghostCount, runType) {
       }
     });
   });
-  placePowerBeans();
+  placePowerItems();
+  placeAiPowerBeans();
+  placeWormholes();
   totalPellets = pellets.size;
   totalPowerPellets = powerPellets.size;
 
   updateScore();
+  updateTimerDisplay();
   ghostCountValue.textContent = ghostCount;
-  gameModeLabel.textContent = `${runType} / Map ${currentMapIndex + 1} / ${ghostCount} ${ghostCount === 1 ? "Ghost" : "Ghosts"}`;
-  statusText.textContent = selectedDevice === "mobile"
-    ? "Use the arrows. Center button spends a power bean."
-    : "Use arrow keys or WASD. Press X to spend a power bean.";
+  const roleLabel = role === "ghost" ? "Ghost Hunt" : "Ocean Maze";
+  gameModeLabel.textContent = `${roleLabel} / ${runType} / Map ${currentMapIndex + 1} / ${ghostCount} ${ghostCount === 1 ? "Ghost" : "Ghosts"}`;
+  statusText.textContent = getControlHint();
   drawGame();
 }
 
 function startGameLoop() {
   gameRunning = true;
+  gameStartTime = performance.now();
   lastFrameTime = performance.now();
   animationId = requestAnimationFrame(gameLoop);
 }
@@ -377,11 +473,67 @@ function pauseGame(message = "") {
 
 function updateScore() {
   scoreValue.textContent = score;
-  pelletProgress.textContent = `Beans ${totalPellets - pellets.size} / ${totalPellets}`;
-  powerProgress.textContent = `Power ${powerInventory - powerUsed} / ${powerPellets.size} left`;
+  pelletProgress.textContent = currentRole === "ghost"
+    ? `Pac beans ${totalPellets - pellets.size} / ${totalPellets}`
+    : `Beans ${totalPellets - pellets.size} / ${totalPellets}`;
+  powerProgress.textContent = `${currentRole === "ghost" ? "Flash" : "Power"} ${powerInventory - powerUsed} / ${powerPellets.size} left`;
   mobilePowerCount.textContent = powerInventory - powerUsed;
   mobileAbilityButton.classList.toggle("ready", powerInventory - powerUsed > 0);
+  mobileAbilityButton.classList.toggle("flash-ready", currentRole === "ghost");
   renderGhostEffects();
+}
+
+function getGhostTimeLimit(ghostCount) {
+  return ghostCount === 1 ? 180000 : ghostCount === 2 ? 240000 : 300000;
+}
+
+function formatTime(milliseconds) {
+  const totalSeconds = Math.max(0, Math.ceil(milliseconds / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function updateTimerDisplay() {
+  if (currentRole === "ghost") {
+    gameTimer.textContent = formatTime(ghostTimeLimit - elapsedTime);
+    gameTimer.classList.toggle("urgent", ghostTimeLimit - elapsedTime <= 30000);
+    gameTimer.setAttribute("aria-label", "Ghost mode countdown timer");
+  } else {
+    gameTimer.textContent = formatTime(elapsedTime);
+    gameTimer.classList.remove("urgent");
+    gameTimer.setAttribute("aria-label", "Pac mode elapsed timer");
+  }
+
+  updateTeleportWarning();
+}
+
+function updateTeleportWarning() {
+  if (!teleportWarning) {
+    return;
+  }
+
+  if (currentRole !== "ghost" || wormholes.length === 0 || ghostStationaryMs < 3000) {
+    teleportWarning.textContent = "";
+    teleportWarning.className = "teleport-warning";
+    return;
+  }
+
+  const second = Math.min(6, Math.floor(ghostStationaryMs / 1000));
+  teleportWarning.textContent = second >= 6 ? "TELEPORT!" : `${second}s`;
+  teleportWarning.className = `teleport-warning active warning-${second}`;
+}
+
+function getControlHint() {
+  if (currentRole === "ghost") {
+    return selectedDevice === "mobile"
+      ? "You are the first ghost. Center button spends Flash."
+      : "You are the first ghost. Use arrows or WASD. Press X to Flash.";
+  }
+
+  return selectedDevice === "mobile"
+    ? "Use the arrows. Center button spends a power bean."
+    : "Use arrow keys or WASD. Press X to spend a power bean.";
 }
 
 function shouldPlacePellet(x, y) {
@@ -419,7 +571,7 @@ function isOpen(x, y) {
   return currentMap.rowsData[y] && currentMap.rowsData[y][x] !== "#";
 }
 
-function movePacman() {
+function movePlayerPacman() {
   if (canMove(pacman, nextDirection)) {
     direction = nextDirection;
   }
@@ -445,7 +597,32 @@ function movePacman() {
   }
 }
 
-function placePowerBeans() {
+function movePlayerGhost() {
+  const playerGhost = ghosts[0];
+  if (!playerGhost || playerGhost.teleporting) {
+    return;
+  }
+
+  if (canMove(playerGhost, nextDirection)) {
+    playerGhost.direction = nextDirection;
+  }
+
+  if (canMove(playerGhost, playerGhost.direction)) {
+    playerGhost.x += playerGhost.direction.x;
+    playerGhost.y += playerGhost.direction.y;
+  }
+
+  const key = `${playerGhost.x},${playerGhost.y}`;
+  if (powerPellets.has(key)) {
+    powerPellets.delete(key);
+    powerInventory += 1;
+    score += 25;
+    statusText.textContent = selectedDevice === "mobile" ? "Flash ready. Tap the center button." : "Flash ready. Press X to dash.";
+    updateScore();
+  }
+}
+
+function placePowerItems() {
   const target = currentGhostCount === 1
     ? (Math.random() < 0.5 ? 1 : 0)
     : currentGhostCount === 2
@@ -478,6 +655,67 @@ function placePowerBeans() {
   });
 }
 
+function placeWormholes() {
+  const target = currentGhostCount === 1
+    ? (Math.random() < 0.4 ? 1 : 0)
+    : currentGhostCount === 2
+    ? (Math.random() < 0.16 ? 3 : 2)
+    : (Math.random() < 0.16 ? 4 : 3);
+
+  if (target === 0) {
+    return;
+  }
+
+  const candidates = [];
+  currentMap.rowsData.forEach((row, y) => {
+    row.split("").forEach((tile, x) => {
+      const key = `${x},${y}`;
+      if (tile !== "." || powerPellets.has(key) || aiPowerPellets.has(key)) {
+        return;
+      }
+
+      const awayFromStarts = Math.abs(x - pacman.x) + Math.abs(y - pacman.y) > 5
+        && ghosts.every((ghost) => Math.abs(x - ghost.x) + Math.abs(y - ghost.y) > 5);
+      if (awayFromStarts && getOpenDirections({ x, y }).length >= 2) {
+        candidates.push({ x, y });
+      }
+    });
+  });
+
+  shuffle(candidates).forEach((cell) => {
+    const farEnough = wormholes.every((hole) => Math.abs(hole.x - cell.x) + Math.abs(hole.y - cell.y) >= Math.max(7, currentMap.cols / 3));
+    if (farEnough && wormholes.length < target) {
+      wormholes.push(cell);
+    }
+  });
+}
+
+function placeAiPowerBeans() {
+  if (currentRole !== "ghost") {
+    return;
+  }
+
+  const candidates = [];
+  currentMap.rowsData.forEach((row, y) => {
+    row.split("").forEach((tile, x) => {
+      const key = `${x},${y}`;
+      if (tile !== "." || powerPellets.has(key)) {
+        return;
+      }
+
+      const awayFromPlayerGhost = ghosts[0] && Math.abs(x - ghosts[0].x) + Math.abs(y - ghosts[0].y) > 6;
+      const notStart = Math.abs(x - pacman.x) + Math.abs(y - pacman.y) > 5;
+      if (awayFromPlayerGhost && notStart && getOpenDirections({ x, y }).length >= 2) {
+        candidates.push({ x, y });
+      }
+    });
+  });
+
+  shuffle(candidates).slice(0, 1).forEach((cell) => {
+    aiPowerPellets.add(`${cell.x},${cell.y}`);
+  });
+}
+
 function getOpenDirections(position) {
   return [
     { x: 1, y: 0 },
@@ -488,6 +726,10 @@ function getOpenDirections(position) {
 }
 
 function moveGhost(ghost) {
+  if (currentRole === "ghost" && ghost.index === 0) {
+    return;
+  }
+
   const options = getOpenDirections(ghost);
 
   if (options.length === 0) {
@@ -603,6 +845,14 @@ function getPhasedDuration() {
   return basePhasedDuration;
 }
 
+function useAbility() {
+  if (currentRole === "ghost") {
+    useFlash();
+  } else {
+    usePowerBean();
+  }
+}
+
 function usePowerBean() {
   if (!gameRunning || powerInventory - powerUsed <= 0) {
     return;
@@ -634,12 +884,77 @@ function usePowerBean() {
   updateScore();
 }
 
+function useFlash() {
+  if (!gameRunning || powerInventory - powerUsed <= 0 || currentRole !== "ghost") {
+    return;
+  }
+
+  const playerGhost = ghosts[0];
+  if (!playerGhost) {
+    return;
+  }
+
+  let dashDirection = playerGhost.direction;
+  if (dashDirection.x === 0 && dashDirection.y === 0) {
+    dashDirection = nextDirection.x !== 0 || nextDirection.y !== 0 ? nextDirection : { x: -1, y: 0 };
+  }
+
+  if (!canMove(playerGhost, dashDirection)) {
+    statusText.textContent = "Flash needs open space ahead.";
+    return;
+  }
+
+  powerUsed += 1;
+  const trail = [{ x: playerGhost.x, y: playerGhost.y }];
+  for (let step = 0; step < 4; step += 1) {
+    if (!canMove(playerGhost, dashDirection)) {
+      break;
+    }
+    playerGhost.x += dashDirection.x;
+    playerGhost.y += dashDirection.y;
+    trail.push({ x: playerGhost.x, y: playerGhost.y });
+    if (playerGhost.x === pacman.x && playerGhost.y === pacman.y) {
+      break;
+    }
+  }
+
+  playerGhost.direction = dashDirection;
+  playerGhost.flashUntil = performance.now() + 520;
+  playerGhost.flashEffectUntil = performance.now() + 2500;
+  flashEffects.push({
+    color: playerGhost.color,
+    trail,
+    startedAt: performance.now(),
+  });
+  score += Math.max(10, (trail.length - 1) * 8);
+  statusText.textContent = "Flash dash.";
+  updateScore();
+}
+
 function findPowerTarget() {
   const candidates = ghosts
     .filter((ghost) => !isGhostPhased(ghost))
     .map((ghost) => ({ ghost, distance: lineDistanceToGhost(ghost) }))
     .filter((item) => item.distance > 0 && item.distance <= powerRange)
     .sort((a, b) => a.distance - b.distance);
+
+  return candidates[0] ? candidates[0].ghost : null;
+}
+
+function findAiPowerTarget() {
+  const candidates = ghosts
+    .filter((ghost) => !isGhostPhased(ghost))
+    .map((ghost) => ({ ghost, distance: lineDistanceToGhost(ghost) }))
+    .filter((item) => item.distance > 0 && item.distance <= powerRange)
+    .sort((a, b) => {
+      if (a.ghost.index === 0 && b.ghost.index !== 0) {
+        return -1;
+      }
+      if (b.ghost.index === 0 && a.ghost.index !== 0) {
+        return 1;
+      }
+      return a.distance - b.distance;
+    });
 
   return candidates[0] ? candidates[0].ghost : null;
 }
@@ -675,7 +990,238 @@ function lineDistanceToGhost(ghost) {
 }
 
 function checkCollision() {
-  return ghosts.some((ghost) => ghost.x === pacman.x && ghost.y === pacman.y && !isGhostPhased(ghost));
+  return ghosts.some((ghost) => ghost.x === pacman.x && ghost.y === pacman.y && !isGhostPhased(ghost) && !ghost.teleporting);
+}
+
+function updateGhostStationary(delta) {
+  if (currentRole !== "ghost" || wormholes.length === 0 || !ghosts[0] || ghosts[0].teleporting) {
+    return;
+  }
+
+  const playerGhost = ghosts[0];
+  const key = `${playerGhost.x},${playerGhost.y}`;
+  if (ghostLastPosition !== key) {
+    ghostLastPosition = key;
+    ghostStationaryMs = 0;
+    return;
+  }
+
+  ghostStationaryMs += delta;
+  if (ghostStationaryMs >= 6000) {
+    startWormholeTeleport(playerGhost);
+  }
+}
+
+function startWormholeTeleport(playerGhost) {
+  if (wormholes.length === 0 || playerGhost.teleporting) {
+    ghostStationaryMs = 0;
+    return;
+  }
+
+  const target = getLikelyTeleportHole();
+  if (!target) {
+    ghostStationaryMs = 0;
+    return;
+  }
+  const from = { x: playerGhost.x, y: playerGhost.y };
+  const duration = pacmanDelay * (currentGhostCount === 1 ? 6 : 5);
+
+  playerGhost.teleporting = {
+    from,
+    to: target,
+    startedAt: performance.now(),
+    duration,
+  };
+  teleportEffects.push({
+    from,
+    to: target,
+    startedAt: performance.now(),
+    duration,
+    color: playerGhost.color,
+  });
+  ghostStationaryMs = 0;
+  teleportWarning.textContent = "TELEPORT!";
+  teleportWarning.className = "teleport-warning active warning-6";
+}
+
+function updateTeleportingGhosts(timestamp) {
+  ghosts.forEach((ghost) => {
+    if (!ghost.teleporting) {
+      return;
+    }
+
+    const progress = (timestamp - ghost.teleporting.startedAt) / ghost.teleporting.duration;
+    if (progress >= 1) {
+      ghost.x = ghost.teleporting.to.x;
+      ghost.y = ghost.teleporting.to.y;
+      ghost.teleporting = null;
+      ghostLastPosition = `${ghost.x},${ghost.y}`;
+      ghostStationaryMs = 0;
+    }
+  });
+}
+
+function moveAiPacman() {
+  const options = getOpenDirections(pacman);
+  if (options.length === 0) {
+    return;
+  }
+  const blockedEscape = isPacBlockedByGhost();
+
+  const ranked = options
+    .map((option) => {
+      const x = pacman.x + option.x;
+      const y = pacman.y + option.y;
+      const nearestGhost = ghosts.reduce((best, ghost) => Math.min(best, Math.abs(x - ghost.x) + Math.abs(y - ghost.y)), Infinity);
+      const nearestPellet = findNearestPelletDistance(x, y);
+      const nearestPower = findNearestAiPowerDistance(x, y);
+      const openSpace = getOpenDirections({ x, y }).length;
+      const intelligence = currentGhostCount === 1 ? 1 : currentGhostCount === 2 ? 1.28 : 1.55;
+      const dangerPenalty = nearestGhost <= 1 ? 46 * intelligence : nearestGhost <= 2 ? 26 * intelligence : nearestGhost <= 4 ? 8 * intelligence : 0;
+      const greedyPull = nearestPellet * (currentGhostCount === 1 ? 2.25 : currentGhostCount === 2 ? 2.5 : 2.75);
+      const powerPull = nearestGhost <= 5 && aiPowerPellets.size > 0 ? nearestPower * (currentGhostCount === 1 ? 1.55 : currentGhostCount === 2 ? 1.85 : 2.15) : 0;
+      const reversePenalty = option.x === -direction.x && option.y === -direction.y ? 2.5 : 0;
+      const greedyNoise = Math.random() < (currentGhostCount === 1 ? 0.18 : currentGhostCount === 2 ? 0.12 : 0.08) ? 5 : 0;
+      const escapeBonus = blockedEscape ? evaluateEscapeRoute(x, y) * (currentGhostCount === 1 ? 9 : currentGhostCount === 2 ? 11 : 13) : 0;
+      const wormholePenalty = getTeleportThreatPenalty(x, y) * intelligence;
+      return {
+        option,
+        score: -greedyPull - powerPull - dangerPenalty - wormholePenalty + openSpace * 1.2 - reversePenalty + greedyNoise + escapeBonus,
+      };
+    })
+    .sort((a, b) => b.score - a.score);
+
+  direction = ranked[0].option;
+  pacman.x += direction.x;
+  pacman.y += direction.y;
+  pacman.mouth += 0.28;
+
+  const key = `${pacman.x},${pacman.y}`;
+  if (pellets.has(key)) {
+    pellets.delete(key);
+    score = Math.max(0, score - 4);
+    updateScore();
+  }
+
+  if (aiPowerPellets.has(key)) {
+    aiPowerPellets.delete(key);
+    useAiPowerBean();
+    updateScore();
+  }
+}
+
+function getTeleportThreatPenalty(x, y) {
+  if (currentRole !== "ghost" || wormholes.length === 0 || ghostStationaryMs < 3200) {
+    return 0;
+  }
+
+  const likelyHole = getLikelyTeleportHole();
+  if (!likelyHole) {
+    return 0;
+  }
+
+  const distance = Math.abs(x - likelyHole.x) + Math.abs(y - likelyHole.y);
+  const pressure = Math.min(1, (ghostStationaryMs - 3000) / 3000);
+  if (distance <= 1) {
+    return 34 * pressure;
+  }
+  if (distance <= 3) {
+    return 20 * pressure;
+  }
+  if (distance <= 5) {
+    return 9 * pressure;
+  }
+  return 0;
+}
+
+function getLikelyTeleportHole() {
+  if (wormholes.length === 0) {
+    return null;
+  }
+
+  return wormholes
+    .map((hole) => ({ hole, distance: Math.abs(hole.x - pacman.x) + Math.abs(hole.y - pacman.y) }))
+    .sort((a, b) => b.distance - a.distance)[0].hole;
+}
+
+function useAiPowerBean() {
+  const target = findAiPowerTarget();
+  if (!target) {
+    statusText.textContent = "AI Pac grabbed a Power Bean, but no ghost was in line.";
+    return;
+  }
+
+  const now = performance.now();
+  target.phaseDuration = 4200;
+  target.phasedUntil = now + 4200;
+  target.timer = 0;
+  laserEffects.push({
+    from: { x: pacman.x, y: pacman.y },
+    to: { x: target.x, y: target.y },
+    startedAt: now,
+  });
+  statusText.textContent = `AI Pac phased the ${target.color} ghost.`;
+}
+
+function isPacBlockedByGhost() {
+  return ghosts.some((ghost) => Math.abs(ghost.x - pacman.x) + Math.abs(ghost.y - pacman.y) <= 3);
+}
+
+function evaluateEscapeRoute(startX, startY) {
+  const visited = new Set();
+  const queue = [{ x: startX, y: startY, distance: 0 }];
+  let openCount = 0;
+  let safety = 0;
+  let pelletSeen = false;
+
+  while (queue.length > 0 && openCount < 18) {
+    const current = queue.shift();
+    const key = `${current.x},${current.y}`;
+    if (visited.has(key) || !isOpen(current.x, current.y)) {
+      continue;
+    }
+
+    visited.add(key);
+    openCount += 1;
+    const nearestGhost = ghosts.reduce((best, ghost) => Math.min(best, Math.abs(current.x - ghost.x) + Math.abs(current.y - ghost.y)), Infinity);
+    safety += Math.min(nearestGhost, 7);
+    if (pellets.has(key) || aiPowerPellets.has(key)) {
+      pelletSeen = true;
+    }
+
+    if (current.distance >= 5) {
+      continue;
+    }
+
+    [
+      { x: 1, y: 0 },
+      { x: -1, y: 0 },
+      { x: 0, y: 1 },
+      { x: 0, y: -1 },
+    ].forEach((move) => {
+      queue.push({ x: current.x + move.x, y: current.y + move.y, distance: current.distance + 1 });
+    });
+  }
+
+  return openCount + safety * 0.18 + (pelletSeen ? 5 : 0);
+}
+
+function findNearestPelletDistance(x, y) {
+  let best = Infinity;
+  pellets.forEach((key) => {
+    const [pelletX, pelletY] = key.split(",").map(Number);
+    best = Math.min(best, Math.abs(x - pelletX) + Math.abs(y - pelletY));
+  });
+  return best === Infinity ? 0 : best;
+}
+
+function findNearestAiPowerDistance(x, y) {
+  let best = Infinity;
+  aiPowerPellets.forEach((key) => {
+    const [powerX, powerY] = key.split(",").map(Number);
+    best = Math.min(best, Math.abs(x - powerX) + Math.abs(y - powerY));
+  });
+  return best === Infinity ? 0 : best;
 }
 
 function softenHeavyPressure() {
@@ -702,12 +1248,19 @@ function gameLoop(timestamp) {
 
   const delta = timestamp - lastFrameTime;
   lastFrameTime = timestamp;
+  elapsedTime = timestamp - gameStartTime;
+  updateTimerDisplay();
+  updateTeleportingGhosts(timestamp);
   pacmanTimer += delta;
 
   if (pacmanTimer >= pacmanDelay) {
     pacmanTimer = 0;
-    movePacman();
-    pacman.mouth += 0.28;
+    if (currentRole === "ghost") {
+      moveAiPacman();
+    } else {
+      movePlayerPacman();
+      pacman.mouth += 0.28;
+    }
   }
 
   ghosts.forEach((ghost) => {
@@ -718,18 +1271,34 @@ function gameLoop(timestamp) {
       moveGhost(ghost);
     }
   });
+
+  if (currentRole === "ghost") {
+    ghostTimer += delta;
+    if (ghostTimer >= getGhostMoveDelay(ghosts[0])) {
+      ghostTimer = 0;
+      movePlayerGhost();
+    }
+    updateGhostStationary(delta);
+  }
   softenHeavyPressure();
 
   laserEffects = laserEffects.filter((effect) => timestamp - effect.startedAt < 420);
+  flashEffects = flashEffects.filter((effect) => timestamp - effect.startedAt < 520);
+  teleportEffects = teleportEffects.filter((effect) => timestamp - effect.startedAt < effect.duration + 260);
   renderGhostEffects();
 
   if (checkCollision()) {
+    finishGame(currentRole === "ghost");
+    return;
+  }
+
+  if (currentRole === "ghost" && elapsedTime >= ghostTimeLimit) {
     finishGame(false);
     return;
   }
 
   if (pellets.size === 0) {
-    finishGame(true);
+    finishGame(currentRole !== "ghost");
     return;
   }
 
@@ -745,8 +1314,10 @@ function finishGame(won) {
 
 function showResult(won) {
   resultKicker.textContent = won ? "Victory" : "Game Over";
-  resultTitle.textContent = won ? "Beautiful run." : "The tide took this one.";
-  resultSummary.textContent = `${score} points · ${currentRunType} · ${currentGhostCount} ${currentGhostCount === 1 ? "Ghost" : "Ghosts"}`;
+  resultTitle.textContent = won
+    ? (currentRole === "ghost" ? "Caught in the tide." : "Beautiful run.")
+    : (currentRole === "ghost" ? "Pac slipped away." : "The tide took this one.");
+  resultSummary.textContent = `${score} points · ${currentRole === "ghost" ? "Ghost Mode" : "Pac Mode"} · ${currentRunType} · ${currentGhostCount} ${currentGhostCount === 1 ? "Ghost" : "Ghosts"}`;
   renderResultStage(won);
   resultActions.innerHTML = "";
 
@@ -770,15 +1341,15 @@ function showResult(won) {
     nextButton.addEventListener("click", () => {
       if (currentRunType === "Story") {
         storyLevel += 1;
-        startCountdown(Math.min(storyLevel, 3), "Story");
+        startCountdown(Math.min(storyLevel, 3), "Story", currentRole);
       } else {
-        startCountdown(currentGhostCount, "Manual");
+        startCountdown(currentGhostCount, "Manual", currentRole);
       }
     });
   } else {
     nextButton.textContent = "Restart";
     nextButton.addEventListener("click", () => {
-      startCountdown(currentGhostCount, currentRunType);
+      startCountdown(currentGhostCount, currentRunType, currentRole);
     });
   }
 
@@ -812,9 +1383,13 @@ function drawGame() {
   context.clearRect(0, 0, canvas.width, canvas.height);
   drawOcean();
   drawMaze();
+  drawWormholes();
+  drawTeleportEffects();
   drawPellets();
+  drawAiPowerPellets();
   drawPowerPellets();
   drawLaserEffects();
+  drawFlashEffects();
   drawPacman();
   ghosts.forEach(drawGhost);
 }
@@ -885,19 +1460,84 @@ function drawPowerPellets() {
     context.save();
     context.translate(cellCenterX(x), cellCenterY(y));
     context.beginPath();
-    context.fillStyle = powerBeanColor;
-    context.shadowColor = "rgba(29, 140, 255, 0.95)";
+    context.fillStyle = currentRole === "ghost" ? flashColor : powerBeanColor;
+    context.shadowColor = currentRole === "ghost" ? "rgba(246, 211, 101, 0.9)" : "rgba(29, 140, 255, 0.95)";
     context.shadowBlur = 20;
-    context.arc(0, 0, Math.max(3.4, tileSize * 0.17) * pulse, 0, Math.PI * 2);
-    context.fill();
+    if (currentRole === "ghost") {
+      drawFlashBolt(0, 0, Math.max(10, tileSize * 0.42) * pulse);
+    } else {
+      context.arc(0, 0, Math.max(3.4, tileSize * 0.17) * pulse, 0, Math.PI * 2);
+      context.fill();
+    }
     context.beginPath();
-    context.strokeStyle = "rgba(190, 233, 255, 0.7)";
+    context.strokeStyle = currentRole === "ghost" ? "rgba(246, 211, 101, 0.7)" : "rgba(190, 233, 255, 0.7)";
     context.lineWidth = Math.max(1, tileSize * 0.035);
     context.arc(0, 0, Math.max(5, tileSize * 0.27), 0, Math.PI * 2);
     context.stroke();
     context.restore();
   });
   context.shadowBlur = 0;
+}
+
+function drawWormholes() {
+  wormholes.forEach((hole) => {
+    const x = cellCenterX(hole.x);
+    const y = cellCenterY(hole.y) + tileSize * 0.18;
+    context.save();
+    context.globalAlpha = 0.78;
+    context.fillStyle = "rgba(2, 14, 34, 0.72)";
+    context.strokeStyle = "rgba(29, 76, 142, 0.78)";
+    context.shadowColor = "rgba(29, 76, 142, 0.55)";
+    context.shadowBlur = 10;
+    context.lineWidth = Math.max(1, tileSize * 0.05);
+    context.beginPath();
+    context.ellipse(x, y, tileSize * 0.43, tileSize * 0.18, 0, 0, Math.PI * 2);
+    context.fill();
+    context.stroke();
+    context.globalAlpha = 0.32;
+    context.beginPath();
+    context.ellipse(x, y, tileSize * 0.56, tileSize * 0.24, 0, 0, Math.PI * 2);
+    context.stroke();
+    context.restore();
+  });
+}
+
+function drawAiPowerPellets() {
+  if (currentRole !== "ghost") {
+    return;
+  }
+
+  const pulse = 0.75 + Math.sin(performance.now() / 210) * 0.25;
+  aiPowerPellets.forEach((key) => {
+    const [x, y] = key.split(",").map(Number);
+    context.save();
+    context.translate(cellCenterX(x), cellCenterY(y));
+    context.beginPath();
+    context.fillStyle = powerBeanColor;
+    context.shadowColor = "rgba(29, 140, 255, 0.95)";
+    context.shadowBlur = 18;
+    context.arc(0, 0, Math.max(3.2, tileSize * 0.15) * pulse, 0, Math.PI * 2);
+    context.fill();
+    context.beginPath();
+    context.strokeStyle = "rgba(190, 233, 255, 0.58)";
+    context.lineWidth = Math.max(1, tileSize * 0.03);
+    context.arc(0, 0, Math.max(5, tileSize * 0.24), 0, Math.PI * 2);
+    context.stroke();
+    context.restore();
+  });
+  context.shadowBlur = 0;
+}
+
+function drawFlashBolt(x, y, size) {
+  context.beginPath();
+  context.moveTo(x + size * 0.08, y - size * 0.5);
+  context.lineTo(x - size * 0.24, y + size * 0.02);
+  context.lineTo(x + size * 0.02, y + size * 0.02);
+  context.lineTo(x - size * 0.12, y + size * 0.52);
+  context.lineTo(x + size * 0.32, y - size * 0.12);
+  context.lineTo(x + size * 0.06, y - size * 0.12);
+  context.closePath();
+  context.fill();
 }
 
 function drawLaserEffects() {
@@ -916,6 +1556,67 @@ function drawLaserEffects() {
     context.moveTo(cellCenterX(effect.from.x), cellCenterY(effect.from.y));
     context.lineTo(cellCenterX(effect.to.x), cellCenterY(effect.to.y));
     context.stroke();
+    context.restore();
+  });
+}
+
+function drawFlashEffects() {
+  const now = performance.now();
+  flashEffects.forEach((effect) => {
+    const age = now - effect.startedAt;
+    const progress = Math.min(1, age / 520);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    const opacity = Math.max(0, 1 - progress);
+    const movingIndex = Math.min(effect.trail.length - 1, Math.floor(eased * (effect.trail.length - 1)));
+    context.save();
+    context.fillStyle = ghostColorValues[effect.color];
+    context.shadowColor = ghostColorValues[effect.color];
+    context.shadowBlur = 18;
+    effect.trail.forEach((point, index) => {
+      context.globalAlpha = opacity * (index + 1) / effect.trail.length * 0.34;
+      context.beginPath();
+      context.arc(cellCenterX(point.x), cellCenterY(point.y), tileSize * 0.28, 0, Math.PI * 2);
+      context.fill();
+    });
+    const current = effect.trail[movingIndex];
+    context.globalAlpha = opacity * 0.78;
+    context.beginPath();
+    context.arc(cellCenterX(current.x), cellCenterY(current.y), tileSize * 0.34, 0, Math.PI * 2);
+    context.fill();
+    context.restore();
+  });
+}
+
+function drawTeleportEffects() {
+  const now = performance.now();
+  teleportEffects.forEach((effect) => {
+    const progress = Math.min(1, (now - effect.startedAt) / effect.duration);
+    const firstHalf = progress < 0.5;
+    const stageProgress = firstHalf ? progress / 0.5 : (progress - 0.5) / 0.5;
+    const point = firstHalf ? effect.from : effect.to;
+    const alpha = firstHalf ? 1 - stageProgress : stageProgress;
+    const lift = Math.sin(stageProgress * Math.PI) * tileSize * 0.22;
+    const x = cellCenterX(point.x);
+    const y = cellCenterY(point.y) - lift;
+
+    context.save();
+    context.globalAlpha = Math.max(0.18, alpha);
+    context.fillStyle = ghostColorValues[effect.color] || ghostColorValues.blue;
+    context.shadowColor = ghostColorValues[effect.color] || ghostColorValues.blue;
+    context.shadowBlur = 20;
+    context.beginPath();
+    context.arc(x, y, tileSize * 0.3, 0, Math.PI * 2);
+    context.fill();
+
+    for (let i = 0; i < 7; i += 1) {
+      const angle = i * 0.9 + now / 160;
+      const radius = tileSize * (0.18 + stageProgress * 0.28);
+      context.globalAlpha = (1 - stageProgress * 0.6) * 0.28;
+      context.beginPath();
+      context.arc(x + Math.cos(angle) * radius, y + Math.sin(angle) * radius, Math.max(1.5, tileSize * 0.045), 0, Math.PI * 2);
+      context.fillStyle = "rgba(224, 238, 255, 0.8)";
+      context.fill();
+    }
     context.restore();
   });
 }
@@ -941,6 +1642,10 @@ function drawPacman() {
 }
 
 function drawGhost(ghost) {
+  if (ghost.teleporting) {
+    return;
+  }
+
   const width = tileSize * 0.62;
   const height = tileSize * 0.72;
   const left = cellCenterX(ghost.x) - width / 2;
@@ -973,6 +1678,10 @@ function drawGhost(ghost) {
     drawDizzyHalo(left + width / 2, top - height * 0.12, width * 0.46);
   }
 
+  if (ghost.flashUntil > performance.now()) {
+    drawGhostFlashBolt(left + width / 2, top - height * 0.2, width * 0.42);
+  }
+
   context.shadowBlur = 0;
 
   context.fillStyle = "#061014";
@@ -985,6 +1694,16 @@ function drawGhost(ghost) {
     context.arc(left + width * 0.64, top + height * 0.42, Math.max(1.6, tileSize * 0.05), 0, Math.PI * 2);
     context.fill();
   }
+  context.restore();
+}
+
+function drawGhostFlashBolt(x, y, size) {
+  context.save();
+  context.fillStyle = flashColor;
+  context.shadowColor = "rgba(246, 211, 101, 0.9)";
+  context.shadowBlur = 12;
+  context.translate(x, y + Math.sin(performance.now() / 90) * 1.2);
+  drawFlashBolt(0, 0, size);
   context.restore();
 }
 
@@ -1013,12 +1732,16 @@ function drawDizzyEye(x, y, radius) {
 
 function saveLeaderboardScore(finalScore, won) {
   const scores = getLeaderboardScores();
+  const runTime = Math.min(elapsedTime, ghostTimeLimit);
   scores.push({
     score: finalScore,
     result: won ? "Victory" : "Game Over",
     runType: currentRunType,
+    role: currentRole === "ghost" ? "Ghost Mode" : "Pac Mode",
     ghosts: currentGhostCount,
     map: currentMapIndex + 1,
+    duration: runTime,
+    timeLimit: currentRole === "ghost" ? ghostTimeLimit : null,
     time: new Date().toLocaleString([], {
       year: "numeric",
       month: "short",
@@ -1030,7 +1753,7 @@ function saveLeaderboardScore(finalScore, won) {
   });
 
   scores.sort((a, b) => b.score - a.score || b.savedAt - a.savedAt);
-  localStorage.setItem("miniPacLeaderboardV2", JSON.stringify(scores.slice(0, 8)));
+  localStorage.setItem("miniPacLeaderboardV2", JSON.stringify(scores.slice(0, 16)));
 }
 
 function getLeaderboardScores() {
@@ -1038,13 +1761,16 @@ function getLeaderboardScores() {
 }
 
 function renderLeaderboard() {
-  const scores = getLeaderboardScores();
+  const scores = getLeaderboardScores().filter((savedScore) => {
+    const role = savedScore.role || "Pac Mode";
+    return leaderboardMode === "ghost" ? role === "Ghost Mode" : role !== "Ghost Mode";
+  });
   leaderboardList.innerHTML = "";
 
   if (scores.length === 0) {
     const empty = document.createElement("div");
     empty.className = "empty-board";
-    empty.textContent = "No scores yet. Start the first run.";
+    empty.textContent = leaderboardMode === "ghost" ? "No ghost runs yet. Start the first hunt." : "No Pac scores yet. Start the first run.";
     leaderboardList.appendChild(empty);
     return;
   }
@@ -1056,7 +1782,7 @@ function renderLeaderboard() {
       <div class="rank">${String(index + 1).padStart(2, "0")}</div>
       <div>
         <div class="entry-score">${savedScore.score} pts</div>
-        <div class="entry-meta">${savedScore.runType} · ${savedScore.ghosts} ${savedScore.ghosts === 1 ? "Ghost" : "Ghosts"} · ${savedScore.result} · Map ${savedScore.map}</div>
+        <div class="entry-meta">${formatLeaderboardMeta(savedScore)}</div>
       </div>
       <div class="entry-time">${savedScore.time}</div>
     `;
@@ -1064,9 +1790,37 @@ function renderLeaderboard() {
   });
 }
 
+function formatLeaderboardMeta(savedScore) {
+  const role = savedScore.role || "Pac Mode";
+  const base = `${role} · ${savedScore.runType} · ${savedScore.ghosts} ${savedScore.ghosts === 1 ? "Ghost" : "Ghosts"} · ${savedScore.result} · Map ${savedScore.map}`;
+  if (role === "Ghost Mode") {
+    return `${base} · ${formatSeconds(savedScore.duration || 0)} / ${formatSeconds(savedScore.timeLimit || getGhostTimeLimit(savedScore.ghosts))}`;
+  }
+  return savedScore.duration ? `${base} · ${formatSeconds(savedScore.duration)}` : base;
+}
+
+function formatSeconds(milliseconds) {
+  return `${Math.ceil(milliseconds / 1000)}s`;
+}
+
 function renderGhostEffects() {
   ghostEffects.innerHTML = "";
   const now = performance.now();
+  if (currentRole === "ghost") {
+    ghosts
+      .filter((ghost) => ghost.flashEffectUntil > now)
+      .forEach((ghost) => {
+        const item = document.createElement("div");
+        item.className = "ghost-effect flash-effect";
+        item.innerHTML = `
+          <span class="effect-ghost ${ghost.color}"></span>
+          <b>dash</b>
+          <i><span></span></i>
+        `;
+        ghostEffects.appendChild(item);
+      });
+  }
+
   ghosts
     .filter((ghost) => ghost.phasedUntil > now)
     .forEach((ghost) => {
@@ -1108,7 +1862,7 @@ document.addEventListener("keydown", (event) => {
 
   if (event.key === "x" || event.key === "X") {
     event.preventDefault();
-    usePowerBean();
+    useAbility();
   }
 });
 
@@ -1349,4 +2103,5 @@ function shuffle(items) {
 renderLeaderboard();
 setDeviceMode(selectedDevice);
 setSkin(selectedSkin);
+setGhostSkin(selectedGhostSkin);
 prepareGame(1, "Story");

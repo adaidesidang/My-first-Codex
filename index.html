@@ -42,7 +42,7 @@
       <section id="devicePage" class="screen">
         <div class="glass-panel centered-panel">
           <p class="eyebrow">Before the arcade</p>
-          <h2 class="splash-title">Choose your device.<span class="version-splash">v1.0 power bean</span></h2>
+          <h2 class="splash-title">Choose your device.<span class="version-splash">v2.0 flash bean</span></h2>
           <p class="panel-text">Click once to frame a device. Click it again to enter the arcade.</p>
           <div class="device-options">
             <button class="device-card" type="button" data-device="desktop">
@@ -69,15 +69,43 @@
             <span></span>
           </div>
           <p class="eyebrow">Seaside arcade</p>
-          <h2>Mini Pac</h2>
+          <h2 class="splash-title">Mini Pac<span class="version-splash menu-splash">v2.0 flash bean</span></h2>
           <nav class="vertical-menu" aria-label="Game menu">
             <button type="button" id="storyStartButton">Start Game</button>
             <button type="button" data-go="leaderboardPage">Leaderboard</button>
-            <button type="button" data-go="levelSelectPage">Select Level</button>
+            <button type="button" id="selectModeButton">Select Level</button>
             <button type="button" data-go="skinsPage">Skins</button>
             <button type="button" data-go="creditsPage">Credits</button>
           </nav>
           <button class="ghost-button lower-back" type="button" data-back>Back</button>
+        </div>
+      </section>
+
+      <section id="roleSelectPage" class="screen">
+        <div class="select-panel">
+          <p class="eyebrow">Role select</p>
+          <h2>Choose Your Side</h2>
+          <p class="panel-text">Click once to frame a role. Click the same card again to continue.</p>
+          <div class="role-cards" aria-label="Select player role">
+            <button class="role-card" type="button" data-role-select="pac">
+              <span class="role-art pac-role-art">
+                <span class="mini-pac"></span>
+                <span class="mini-ghost blue"></span>
+              </span>
+              <strong>Pac Mode</strong>
+            </button>
+            <button class="role-card" type="button" data-role-select="ghost">
+              <span class="role-art ghost-role-art">
+                <span class="mini-ghost red"></span>
+                <span class="mini-pac"></span>
+                <span class="flash-symbol"></span>
+              </span>
+              <strong>Ghost Mode</strong>
+            </button>
+          </div>
+          <div class="actions split-actions">
+            <button class="ghost-button" type="button" data-back>Back</button>
+          </div>
         </div>
       </section>
 
@@ -92,7 +120,7 @@
                 <span class="mini-pac"></span>
                 <span class="mini-ghost blue"></span>
               </span>
-              <strong>One Ghost</strong>
+              <strong>Un Ghost</strong>
             </button>
             <button class="level-card" type="button" data-ghost-select="2">
               <span class="level-art level-art-two">
@@ -100,7 +128,7 @@
                 <span class="mini-ghost blue"></span>
                 <span class="mini-ghost red"></span>
               </span>
-              <strong>Two Ghosts</strong>
+              <strong>Duo Ghosts</strong>
             </button>
             <button class="level-card" type="button" data-ghost-select="3">
               <span class="level-art level-art-three">
@@ -109,7 +137,7 @@
                 <span class="mini-ghost blue"></span>
                 <span class="mini-ghost yellow"></span>
               </span>
-              <strong>Three Ghosts</strong>
+              <strong>Trios Ghosts</strong>
             </button>
           </div>
           <div class="actions split-actions">
@@ -122,7 +150,8 @@
         <div class="select-panel">
           <p class="eyebrow">Choose a glow</p>
           <h2>Skins</h2>
-          <p class="panel-text">Pick a Pac color. Your selection follows you into the maze.</p>
+          <p class="panel-text">Pick colors for Pac Mode and your playable ghost in Ghost Mode.</p>
+          <p class="skin-label">Pac Skin</p>
           <div class="skin-grid" aria-label="Choose Pac-Man skin">
             <button class="skin-card" type="button" data-skin="red" style="--skin-color: #ff4d6d;">
               <span></span>
@@ -153,6 +182,29 @@
               <strong>Purple</strong>
             </button>
           </div>
+          <p class="skin-label">Ghost Skin</p>
+          <div class="skin-grid ghost-skin-grid" aria-label="Choose playable ghost skin">
+            <button class="skin-card ghost-skin-card" type="button" data-ghost-skin="blue" style="--skin-color: #4db8ff;">
+              <span></span>
+              <strong>Blue</strong>
+            </button>
+            <button class="skin-card ghost-skin-card" type="button" data-ghost-skin="red" style="--skin-color: #f07167;">
+              <span></span>
+              <strong>Red</strong>
+            </button>
+            <button class="skin-card ghost-skin-card" type="button" data-ghost-skin="yellow" style="--skin-color: #ffd166;">
+              <span></span>
+              <strong>Yellow</strong>
+            </button>
+            <button class="skin-card ghost-skin-card" type="button" data-ghost-skin="green" style="--skin-color: #7bd88f;">
+              <span></span>
+              <strong>Green</strong>
+            </button>
+            <button class="skin-card ghost-skin-card" type="button" data-ghost-skin="violet" style="--skin-color: #b983ff;">
+              <span></span>
+              <strong>Violet</strong>
+            </button>
+          </div>
           <div class="actions split-actions">
             <button class="ghost-button" type="button" data-back>Back</button>
             <button class="primary-button" type="button" data-go="gameMenuPage">Enter Menu</button>
@@ -174,6 +226,10 @@
             <div>
               <p class="eyebrow" id="gameModeLabel">Ocean maze</p>
               <h2>Mini Pac</h2>
+            </div>
+            <div class="timer-stack">
+              <div class="game-timer" id="gameTimer">00:00</div>
+              <div class="teleport-warning" id="teleportWarning"></div>
             </div>
             <div class="score-cluster">
               <div class="scoreboard">
@@ -225,6 +281,10 @@
         <div class="leaderboard-panel">
           <p class="eyebrow">Best runs</p>
           <h2>Leaderboard</h2>
+          <div class="leaderboard-toggle" aria-label="Leaderboard mode">
+            <button class="active" type="button" data-leaderboard-mode="pac">Pac</button>
+            <button type="button" data-leaderboard-mode="ghost">Ghost</button>
+          </div>
           <div id="leaderboardList" class="leaderboard-list"></div>
           <div class="actions split-actions">
             <button class="ghost-button" type="button" data-back>Back</button>
@@ -256,6 +316,73 @@
       <p class="eyebrow">Update Notes</p>
       <h2 id="patchTitle">Version Log</h2>
       <div class="patch-scroll">
+        <article class="patch-entry featured-entry">
+          <header>
+            <h3>Version 2.3</h3>
+            <time>May 31, 2026</time>
+          </header>
+          <p>
+            Added a smoother animated leaderboard switch, French-styled level labels, and sharper AI Pac routing
+            in Duo and Trios Ghost maps.
+          </p>
+          <p>
+            Ghost Mode now gives AI Pac one Power Bean in every map size, keeping the hunt fair but active.
+          </p>
+        </article>
+
+        <article class="patch-entry">
+          <header>
+            <h3>Version 2.2</h3>
+            <time>May 31, 2026</time>
+          </header>
+          <p>
+            Added Ghost Skin selection and a new wormhole anti-blocking rule for Ghost Mode.
+            If the player ghost holds one tile too long, it is pulled into a deep-blue portal.
+          </p>
+          <p>
+            Flash scoreboard animation now lasts longer, and portals move the player ghost to the hole
+            farthest from Pac with a short mist-and-particle teleport effect.
+          </p>
+        </article>
+
+        <article class="patch-entry">
+          <header>
+            <h3>Version 2.1</h3>
+            <time>May 31, 2026</time>
+          </header>
+          <p>
+            Tuned Ghost Mode pacing with a clearer countdown, Pac-first bean chasing, and two-page leaderboards
+            for Pac and Ghost records.
+          </p>
+          <p>
+            Flash Bean now belongs only to the player ghost, dashes four tiles with a color afterimage,
+            and shows a small golden lightning mark during the dash.
+          </p>
+        </article>
+
+        <article class="patch-entry">
+          <header>
+            <h3>Version 2.0</h3>
+            <time>May 31, 2026</time>
+          </header>
+          <p>
+            Added Ghost Mode, a new role where the player controls the lead ghost and hunts an AI Pac.
+            The Pac still focuses on clearing beans, but uses cautious pathing when a ghost gets too close.
+          </p>
+          <div class="patch-demo ghost-hunt-demo" aria-label="Ghost hunt mode animation">
+            <span class="demo-ghost chase"></span>
+            <span class="demo-pac fleeing"></span>
+          </div>
+          <p>
+            Added Flash Bean, a ghost-only item for the player ghost. It uses the same X / center-button input
+            as Power Bean, but turns that input into a short directional dash.
+          </p>
+          <div class="patch-demo flash-demo" aria-label="Flash item animation">
+            <span class="demo-flash"></span>
+            <span class="demo-ghost dash"></span>
+          </div>
+        </article>
+
         <article class="patch-entry">
           <header>
             <h3>Version 1.2</h3>
