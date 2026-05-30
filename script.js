@@ -93,6 +93,8 @@ let nextDirection = { x: 0, y: 0 };
 let currentGhostCount = 1;
 let currentRunType = "Story";
 let storyLevel = 1;
+let threeGhostStreak = 0;
+let threeGhostDifficulty = 0;
 let selectedGhostCount = null;
 let selectedDeviceChoice = null;
 let selectedDevice = localStorage.getItem("miniPacDevice") || "desktop";
@@ -297,6 +299,13 @@ function startCountdown(ghostCount, runType) {
 function prepareGame(ghostCount, runType) {
   currentGhostCount = ghostCount;
   currentRunType = runType;
+  if (ghostCount === 3) {
+    threeGhostStreak += 1;
+    threeGhostDifficulty = Math.min(Math.max(0, threeGhostStreak - 1) * 0.045, 0.18);
+  } else {
+    threeGhostStreak = 0;
+    threeGhostDifficulty = 0;
+  }
   currentMapIndex = drawMapIndex(ghostCount);
   currentMap = mapDecks[ghostCount][currentMapIndex];
   tileSize = Math.min(
@@ -322,11 +331,13 @@ function prepareGame(ghostCount, runType) {
   ghostTimer = 0;
   ghosts = currentMap.ghostStarts.slice(0, ghostCount).map((start, index) => ({
     ...start,
+    index,
     color: ghostColors[index],
     direction: { x: index % 2 === 0 ? -1 : 1, y: 0 },
     memory: [],
     timer: 0,
     phasedUntil: 0,
+    pressureDumbUntil: 0,
     wobble: 0,
   }));
 
@@ -484,22 +495,30 @@ function moveGhost(ghost) {
   }
 
   const phased = isGhostPhased(ghost);
+  const pressured = ghost.pressureDumbUntil > performance.now();
   const reverse = { x: -ghost.direction.x, y: -ghost.direction.y };
   const forwardWorks = canMove(ghost, ghost.direction);
   const filtered = options.filter((option) => option.x !== reverse.x || option.y !== reverse.y);
   const choices = filtered.length > 0 ? filtered : options;
-  const shouldChoose = !forwardWorks || choices.length > 1 && Math.random() < (phased ? 0.7 : 0.42);
+  const lineChase = !pressured && !phased ? getLineChaseDirection(ghost, choices) : null;
+  const shouldChoose = Boolean(lineChase) || pressured || !forwardWorks || choices.length > 1 && Math.random() < (phased ? 0.7 : 0.42);
 
   if (shouldChoose) {
     const ranked = choices
       .map((option) => ({ option, distance: ghostDistance(ghost.x + option.x, ghost.y + option.y) }))
       .sort((a, b) => a.distance - b.distance);
 
-    if (phased) {
+    if (pressured) {
+      ghost.direction = Math.random() < 0.68
+        ? ranked[ranked.length - 1].option
+        : choices[Math.floor(Math.random() * choices.length)];
+    } else if (phased) {
       ghost.direction = Math.random() < 0.46
         ? ranked[ranked.length - 1].option
         : ranked[0].option;
       ghost.wobble += 1;
+    } else if (lineChase && Math.random() < 0.86 + threeGhostDifficulty) {
+      ghost.direction = lineChase;
     } else if (Math.random() < 0.58) {
       ghost.direction = ranked[0].option;
     } else {
@@ -531,6 +550,37 @@ function getGhostMoveDelay(ghost) {
   }
 
   return ghostDelay;
+}
+
+function getLineChaseDirection(ghost, choices) {
+  if (currentGhostCount !== 3) {
+    return null;
+  }
+
+  const sameColumn = ghost.x === pacman.x;
+  const sameRow = ghost.y === pacman.y;
+  if (!sameColumn && !sameRow) {
+    return null;
+  }
+
+  const directionToPacman = sameColumn
+    ? { x: 0, y: Math.sign(pacman.y - ghost.y) }
+    : { x: Math.sign(pacman.x - ghost.x), y: 0 };
+
+  if (directionToPacman.x === 0 && directionToPacman.y === 0) {
+    return null;
+  }
+
+  const distance = sameColumn ? Math.abs(pacman.y - ghost.y) : Math.abs(pacman.x - ghost.x);
+  for (let step = 1; step < distance; step += 1) {
+    const x = ghost.x + directionToPacman.x * step;
+    const y = ghost.y + directionToPacman.y * step;
+    if (!isOpen(x, y)) {
+      return null;
+    }
+  }
+
+  return choices.find((choice) => choice.x === directionToPacman.x && choice.y === directionToPacman.y) || null;
 }
 
 function ghostDistance(x, y) {
@@ -628,6 +678,23 @@ function checkCollision() {
   return ghosts.some((ghost) => ghost.x === pacman.x && ghost.y === pacman.y && !isGhostPhased(ghost));
 }
 
+function softenHeavyPressure() {
+  if (currentGhostCount !== 3 || ghosts.length < 3) {
+    return;
+  }
+
+  const now = performance.now();
+  if (ghosts.some((ghost) => ghost.pressureDumbUntil > now)) {
+    return;
+  }
+
+  const closeGhosts = ghosts.filter((ghost) => ghostDistance(ghost.x, ghost.y) <= 5 && !isGhostPhased(ghost));
+  if (closeGhosts.length === 3 && Math.random() < 0.035) {
+    const chosen = closeGhosts[Math.floor(Math.random() * closeGhosts.length)];
+    chosen.pressureDumbUntil = now + 1800;
+  }
+}
+
 function gameLoop(timestamp) {
   if (!gameRunning) {
     return;
@@ -651,6 +718,7 @@ function gameLoop(timestamp) {
       moveGhost(ghost);
     }
   });
+  softenHeavyPressure();
 
   laserEffects = laserEffects.filter((effect) => timestamp - effect.startedAt < 420);
   renderGhostEffects();
@@ -922,10 +990,13 @@ function drawGhost(ghost) {
 
 function drawDizzyHalo(x, y, radius) {
   context.save();
-  context.strokeStyle = "rgba(125, 255, 166, 0.9)";
+  const pulse = 0.86 + Math.sin(performance.now() / 180) * 0.14;
+  context.strokeStyle = "rgba(228, 193, 111, 0.94)";
+  context.shadowColor = "rgba(228, 193, 111, 0.72)";
+  context.shadowBlur = 12;
   context.lineWidth = Math.max(1, tileSize * 0.04);
   context.beginPath();
-  context.ellipse(x, y + Math.sin(performance.now() / 180) * 1.6, radius, radius * 0.34, 0, 0, Math.PI * 2);
+  context.ellipse(x, y + Math.sin(performance.now() / 180) * 1.6, radius * pulse, radius * 0.34, 0, 0, Math.PI * 2);
   context.stroke();
   context.restore();
 }
