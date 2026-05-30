@@ -110,6 +110,7 @@ let pacman = null;
 let ghosts = [];
 let direction = { x: 0, y: 0 };
 let nextDirection = { x: 0, y: 0 };
+let pacRecentPositions = [];
 let currentGhostCount = 1;
 let currentRunType = "Story";
 let currentRole = "pac";
@@ -329,8 +330,27 @@ function setGhostSkin(skin) {
   ghostSkinCards.forEach((card) => card.classList.toggle("selected", card.dataset.ghostSkin === skin));
   if (currentRole === "ghost" && ghosts[0]) {
     ghosts[0].color = selectedGhostSkin;
+    const palette = getGhostPalette(currentRole, currentGhostCount);
+    ghosts.forEach((ghost, index) => {
+      ghost.color = palette[index];
+    });
     drawGame();
   }
+}
+
+function getGhostPalette(role, ghostCount) {
+  if (role !== "ghost") {
+    return ghostColors.slice(0, ghostCount);
+  }
+
+  const fallback = ["blue", "red", "yellow", "green", "violet"];
+  const palette = [selectedGhostSkin];
+  fallback.forEach((color) => {
+    if (palette.length < ghostCount && color !== selectedGhostSkin) {
+      palette.push(color);
+    }
+  });
+  return palette;
 }
 
 function setDirectionFromName(name) {
@@ -413,16 +433,18 @@ function prepareGame(ghostCount, runType, role = currentRole) {
   ghostTimeLimit = getGhostTimeLimit(ghostCount);
   gameRunning = false;
   pacman = { ...currentMap.playerStart, mouth: 0 };
+  pacRecentPositions = [`${pacman.x},${pacman.y}`];
   direction = { x: 0, y: 0 };
   nextDirection = { x: 0, y: 0 };
   pacmanTimer = 0;
   ghostTimer = 0;
   ghostStationaryMs = 0;
   ghostLastPosition = null;
+  const ghostPalette = getGhostPalette(role, ghostCount);
   ghosts = currentMap.ghostStarts.slice(0, ghostCount).map((start, index) => ({
     ...start,
     index,
-    color: role === "ghost" && index === 0 ? selectedGhostSkin : ghostColors[index],
+    color: ghostPalette[index],
     direction: { x: index % 2 === 0 ? -1 : 1, y: 0 },
     memory: [],
     timer: 0,
@@ -1076,17 +1098,18 @@ function moveAiPacman() {
       const nearestPellet = findNearestPelletDistance(x, y);
       const nearestPower = findNearestAiPowerDistance(x, y);
       const openSpace = getOpenDirections({ x, y }).length;
-      const intelligence = currentGhostCount === 1 ? 1 : currentGhostCount === 2 ? 1.28 : 1.55;
+      const intelligence = currentGhostCount === 1 ? 1 : currentGhostCount === 2 ? 1.42 : 1.78;
       const dangerPenalty = nearestGhost <= 1 ? 46 * intelligence : nearestGhost <= 2 ? 26 * intelligence : nearestGhost <= 4 ? 8 * intelligence : 0;
-      const greedyPull = nearestPellet * (currentGhostCount === 1 ? 2.25 : currentGhostCount === 2 ? 2.5 : 2.75);
-      const powerPull = nearestGhost <= 5 && aiPowerPellets.size > 0 ? nearestPower * (currentGhostCount === 1 ? 1.55 : currentGhostCount === 2 ? 1.85 : 2.15) : 0;
-      const reversePenalty = option.x === -direction.x && option.y === -direction.y ? 2.5 : 0;
-      const greedyNoise = Math.random() < (currentGhostCount === 1 ? 0.18 : currentGhostCount === 2 ? 0.12 : 0.08) ? 5 : 0;
-      const escapeBonus = blockedEscape ? evaluateEscapeRoute(x, y) * (currentGhostCount === 1 ? 9 : currentGhostCount === 2 ? 11 : 13) : 0;
+      const greedyPull = nearestPellet * (currentGhostCount === 1 ? 2.25 : currentGhostCount === 2 ? 2.65 : 3.05);
+      const powerPull = nearestGhost <= 5 && aiPowerPellets.size > 0 ? nearestPower * (currentGhostCount === 1 ? 1.55 : currentGhostCount === 2 ? 2.08 : 2.48) : 0;
+      const reversePenalty = option.x === -direction.x && option.y === -direction.y ? (currentGhostCount === 1 ? 2.5 : currentGhostCount === 2 ? 8 : 12) : 0;
+      const oscillationPenalty = wouldRepeatPacStep(x, y) ? (currentGhostCount === 1 ? 1.5 : currentGhostCount === 2 ? 9 : 14) : 0;
+      const greedyNoise = Math.random() < (currentGhostCount === 1 ? 0.18 : currentGhostCount === 2 ? 0.08 : 0.04) ? 5 : 0;
+      const escapeBonus = blockedEscape ? evaluateEscapeRoute(x, y) * (currentGhostCount === 1 ? 9 : currentGhostCount === 2 ? 13 : 16) : 0;
       const wormholePenalty = getTeleportThreatPenalty(x, y) * intelligence;
       return {
         option,
-        score: -greedyPull - powerPull - dangerPenalty - wormholePenalty + openSpace * 1.2 - reversePenalty + greedyNoise + escapeBonus,
+        score: -greedyPull - powerPull - dangerPenalty - wormholePenalty + openSpace * 1.2 - reversePenalty - oscillationPenalty + greedyNoise + escapeBonus,
       };
     })
     .sort((a, b) => b.score - a.score);
@@ -1094,6 +1117,7 @@ function moveAiPacman() {
   direction = ranked[0].option;
   pacman.x += direction.x;
   pacman.y += direction.y;
+  rememberPacPosition();
   pacman.mouth += 0.28;
 
   const key = `${pacman.x},${pacman.y}`;
@@ -1132,6 +1156,18 @@ function getTeleportThreatPenalty(x, y) {
     return 9 * pressure;
   }
   return 0;
+}
+
+function rememberPacPosition() {
+  pacRecentPositions.push(`${pacman.x},${pacman.y}`);
+  if (pacRecentPositions.length > 6) {
+    pacRecentPositions.shift();
+  }
+}
+
+function wouldRepeatPacStep(x, y) {
+  const key = `${x},${y}`;
+  return pacRecentPositions.slice(-4, -1).filter((position) => position === key).length > 0;
 }
 
 function getLikelyTeleportHole() {

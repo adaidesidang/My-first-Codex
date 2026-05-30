@@ -1398,29 +1398,40 @@ body.mobile-mode .game-layout {
   grid-template-columns: 1fr 1fr;
   width: min(320px, 100%);
   margin: 26px auto 0;
-  padding: 4px;
-  border: 1px solid rgba(248, 244, 235, 0.16);
+  padding: 5px;
+  border: 1px solid rgba(248, 244, 235, 0.2);
   border-radius: 999px;
   background: rgba(248, 244, 235, 0.08);
-  box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.18);
+  box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.18), 0 16px 44px rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(18px);
+  overflow: hidden;
 }
 
 .leaderboard-toggle::before {
   content: "";
   position: absolute;
-  top: 4px;
-  bottom: 4px;
-  left: 4px;
-  width: calc(50% - 4px);
+  top: 5px;
+  bottom: 5px;
+  left: 5px;
+  width: calc(50% - 5px);
   border-radius: 999px;
-  background: linear-gradient(120deg, var(--ink), var(--gold));
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
-  transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), filter 0.28s ease;
+  background: linear-gradient(120deg, rgba(248, 244, 235, 0.86), rgba(228, 193, 111, 0.92));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.42);
+  transition: transform 0.42s cubic-bezier(0.2, 1.25, 0.24, 1), filter 0.28s ease, box-shadow 0.28s ease;
+}
+
+.leaderboard-toggle::after {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border-radius: inherit;
+  background: linear-gradient(120deg, rgba(255, 255, 255, 0.18), transparent 45%, rgba(67, 232, 216, 0.08));
+  pointer-events: none;
 }
 
 .leaderboard-toggle:has(button[data-leaderboard-mode="ghost"].active)::before {
   transform: translateX(100%);
-  filter: drop-shadow(0 0 12px rgba(228, 193, 111, 0.22));
+  filter: drop-shadow(0 0 14px rgba(228, 193, 111, 0.28));
 }
 
 .leaderboard-toggle button {
@@ -1435,12 +1446,14 @@ body.mobile-mode .game-layout {
   background: transparent;
   font-size: 14px;
   letter-spacing: 0.02em;
+  transition: color 0.22s ease, transform 0.22s ease;
 }
 
 .leaderboard-toggle button.active {
   color: #061014;
   background: transparent;
   box-shadow: none;
+  transform: scale(1.02);
 }
 
 .leaderboard-entry {
