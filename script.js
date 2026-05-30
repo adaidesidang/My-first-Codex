@@ -1,8 +1,10 @@
 const screens = {
   homePage: document.querySelector("#homePage"),
   invitePage: document.querySelector("#invitePage"),
+  devicePage: document.querySelector("#devicePage"),
   gameMenuPage: document.querySelector("#gameMenuPage"),
   levelSelectPage: document.querySelector("#levelSelectPage"),
+  skinsPage: document.querySelector("#skinsPage"),
   countdownPage: document.querySelector("#countdownPage"),
   gamePage: document.querySelector("#gamePage"),
   resultPage: document.querySelector("#resultPage"),
@@ -29,6 +31,9 @@ const resultSummary = document.querySelector("#resultSummary");
 const resultActions = document.querySelector("#resultActions");
 const resultStage = document.querySelector("#resultStage");
 const levelCards = document.querySelectorAll("[data-ghost-select]");
+const deviceButtons = document.querySelectorAll("[data-device]");
+const moveButtons = document.querySelectorAll("[data-move]");
+const skinCards = document.querySelectorAll("[data-skin]");
 
 const canvasWidth = canvas.width;
 const canvasHeight = canvas.height;
@@ -40,6 +45,15 @@ const ghostColorValues = {
   blue: "#4db8ff",
   red: "#f07167",
   yellow: "#ffd166",
+};
+const skinColorValues = {
+  red: "#ff4d6d",
+  orange: "#ff9f1c",
+  yellow: "#e4c16f",
+  green: "#7bd88f",
+  cyan: "#43e8d8",
+  blue: "#4db8ff",
+  purple: "#b983ff",
 };
 
 let currentMap = null;
@@ -62,6 +76,8 @@ let currentGhostCount = 1;
 let currentRunType = "Story";
 let storyLevel = 1;
 let selectedGhostCount = null;
+let selectedDevice = localStorage.getItem("miniPacDevice") || "desktop";
+let selectedSkin = localStorage.getItem("miniPacSkin") || "yellow";
 
 const mapDecks = {
   1: createDeck(1),
@@ -115,6 +131,13 @@ document.querySelectorAll("[data-back]").forEach((button) => {
   button.addEventListener("click", goBack);
 });
 
+deviceButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    setDeviceMode(button.dataset.device);
+    showScreen("gameMenuPage");
+  });
+});
+
 storyStartButton.addEventListener("click", () => {
   storyLevel = 1;
   startCountdown(1, "Story");
@@ -145,6 +168,46 @@ exitGameButton.addEventListener("click", () => {
   historyStack.push("homePage", "invitePage", "gameMenuPage");
   showScreen("gameMenuPage", false);
 });
+
+moveButtons.forEach((button) => {
+  button.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+    setDirectionFromName(button.dataset.move);
+  });
+});
+
+skinCards.forEach((card) => {
+  card.addEventListener("click", () => {
+    setSkin(card.dataset.skin);
+  });
+});
+
+function setDeviceMode(device) {
+  selectedDevice = device;
+  localStorage.setItem("miniPacDevice", device);
+  document.body.classList.toggle("mobile-mode", device === "mobile");
+  document.body.classList.toggle("desktop-mode", device !== "mobile");
+}
+
+function setSkin(skin) {
+  selectedSkin = skin;
+  localStorage.setItem("miniPacSkin", skin);
+  skinCards.forEach((card) => card.classList.toggle("selected", card.dataset.skin === skin));
+  drawGame();
+}
+
+function setDirectionFromName(name) {
+  const directions = {
+    up: { x: 0, y: -1 },
+    down: { x: 0, y: 1 },
+    left: { x: -1, y: 0 },
+    right: { x: 1, y: 0 },
+  };
+
+  if (directions[name]) {
+    nextDirection = directions[name];
+  }
+}
 
 function startCountdown(ghostCount, runType) {
   pauseGame();
@@ -432,6 +495,8 @@ function renderResultStage(won) {
   const pac = document.createElement("span");
   pac.className = "runner result-pac";
   pac.style.left = won ? "18%" : "30%";
+  pac.style.background = `conic-gradient(from 36deg, transparent 0deg 74deg, ${skinColorValues[selectedSkin]} 75deg 360deg)`;
+  pac.style.boxShadow = `0 0 26px ${skinColorValues[selectedSkin]}`;
   resultStage.appendChild(pac);
 
   ghosts.forEach((ghost, index) => {
@@ -466,13 +531,13 @@ function cellCenterY(y) {
 
 function drawOcean() {
   const gradient = context.createLinearGradient(0, 0, canvas.width, canvas.height);
-  gradient.addColorStop(0, "#07131d");
-  gradient.addColorStop(0.55, "#071f2b");
-  gradient.addColorStop(1, "#05070c");
+  gradient.addColorStop(0, "#081426");
+  gradient.addColorStop(0.5, "#073042");
+  gradient.addColorStop(1, "#090712");
   context.fillStyle = gradient;
   context.fillRect(0, 0, canvas.width, canvas.height);
 
-  context.strokeStyle = "rgba(100, 210, 200, 0.08)";
+  context.strokeStyle = "rgba(67, 232, 216, 0.12)";
   context.lineWidth = 2;
   for (let y = 34; y < canvas.height; y += 56) {
     context.beginPath();
@@ -493,7 +558,7 @@ function drawMaze() {
         const inset = Math.max(2, tileSize * 0.08);
         context.fillStyle = "rgba(10, 20, 31, 0.92)";
         context.fillRect(left + inset, top + inset, tileSize - inset * 2, tileSize - inset * 2);
-        context.strokeStyle = "rgba(100, 210, 200, 0.38)";
+        context.strokeStyle = "rgba(67, 232, 216, 0.55)";
         context.lineWidth = Math.max(1, tileSize * 0.045);
         context.strokeRect(left + inset * 1.6, top + inset * 1.6, tileSize - inset * 3.2, tileSize - inset * 3.2);
       }
@@ -506,8 +571,8 @@ function drawPellets() {
     const [x, y] = key.split(",").map(Number);
     context.beginPath();
     context.fillStyle = "#f8f4eb";
-    context.shadowColor = "rgba(248, 244, 235, 0.8)";
-    context.shadowBlur = 8;
+    context.shadowColor = "rgba(67, 232, 216, 0.95)";
+    context.shadowBlur = 10;
     context.arc(cellCenterX(x), cellCenterY(y), Math.max(2.2, tileSize * 0.12), 0, Math.PI * 2);
     context.fill();
     context.shadowBlur = 0;
@@ -526,9 +591,9 @@ function drawPacman() {
   context.moveTo(0, 0);
   context.arc(0, 0, radius, mouth, Math.PI * 2 - mouth);
   context.closePath();
-  context.fillStyle = "#e4c16f";
-  context.shadowColor = "rgba(228, 193, 111, 0.65)";
-  context.shadowBlur = 16;
+  context.fillStyle = skinColorValues[selectedSkin];
+  context.shadowColor = skinColorValues[selectedSkin];
+  context.shadowBlur = 18;
   context.fill();
   context.shadowBlur = 0;
   context.restore();
@@ -872,4 +937,6 @@ function shuffle(items) {
 }
 
 renderLeaderboard();
+setDeviceMode(selectedDevice);
+setSkin(selectedSkin);
 prepareGame(1, "Story");

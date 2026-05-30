@@ -34,7 +34,28 @@
           <p class="panel-text">Un petit jeu by the sea, made for one quiet glowing screen.</p>
           <div class="actions split-actions">
             <button class="ghost-button" type="button" data-back>Back</button>
-            <button class="primary-button" type="button" data-go="gameMenuPage">Enter</button>
+            <button class="primary-button" type="button" data-go="devicePage">Enter</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="devicePage" class="screen">
+        <div class="glass-panel centered-panel">
+          <p class="eyebrow">Before the arcade</p>
+          <h2>Choose your device.</h2>
+          <p class="panel-text">Desktop keeps the keyboard controls. Mobile adds touch arrows for phone and iPad.</p>
+          <div class="device-options">
+            <button class="device-card" type="button" data-device="desktop">
+              <span class="device-icon desktop-icon"></span>
+              <strong>Desktop</strong>
+            </button>
+            <button class="device-card" type="button" data-device="mobile">
+              <span class="device-icon mobile-icon"></span>
+              <strong>Mobile</strong>
+            </button>
+          </div>
+          <div class="actions split-actions">
+            <button class="ghost-button" type="button" data-back>Back</button>
           </div>
         </div>
       </section>
@@ -50,6 +71,7 @@
             <button type="button" id="storyStartButton">Start Game</button>
             <button type="button" data-go="leaderboardPage">Leaderboard</button>
             <button type="button" data-go="levelSelectPage">Select Level</button>
+            <button type="button" data-go="skinsPage">Skins</button>
             <button type="button" data-go="creditsPage">Credits</button>
           </nav>
           <button class="ghost-button lower-back" type="button" data-back>Back</button>
@@ -93,6 +115,48 @@
         </div>
       </section>
 
+      <section id="skinsPage" class="screen">
+        <div class="select-panel">
+          <p class="eyebrow">Choose a glow</p>
+          <h2>Skins</h2>
+          <p class="panel-text">Pick a Pac color. Your selection follows you into the maze.</p>
+          <div class="skin-grid" aria-label="Choose Pac-Man skin">
+            <button class="skin-card" type="button" data-skin="red" style="--skin-color: #ff4d6d;">
+              <span></span>
+              <strong>Red</strong>
+            </button>
+            <button class="skin-card" type="button" data-skin="orange" style="--skin-color: #ff9f1c;">
+              <span></span>
+              <strong>Orange</strong>
+            </button>
+            <button class="skin-card" type="button" data-skin="yellow" style="--skin-color: #e4c16f;">
+              <span></span>
+              <strong>Yellow</strong>
+            </button>
+            <button class="skin-card" type="button" data-skin="green" style="--skin-color: #7bd88f;">
+              <span></span>
+              <strong>Green</strong>
+            </button>
+            <button class="skin-card" type="button" data-skin="cyan" style="--skin-color: #43e8d8;">
+              <span></span>
+              <strong>Cyan</strong>
+            </button>
+            <button class="skin-card" type="button" data-skin="blue" style="--skin-color: #4db8ff;">
+              <span></span>
+              <strong>Blue</strong>
+            </button>
+            <button class="skin-card" type="button" data-skin="purple" style="--skin-color: #b983ff;">
+              <span></span>
+              <strong>Purple</strong>
+            </button>
+          </div>
+          <div class="actions split-actions">
+            <button class="ghost-button" type="button" data-back>Back</button>
+            <button class="primary-button" type="button" data-go="gameMenuPage">Enter Menu</button>
+          </div>
+        </div>
+      </section>
+
       <section id="countdownPage" class="screen">
         <div class="countdown-panel">
           <p class="eyebrow" id="countdownMode">Story mode</p>
@@ -119,7 +183,16 @@
               </div>
             </div>
           </header>
-          <canvas id="gameCanvas" width="800" height="600" aria-label="Pac-Man style game"></canvas>
+          <div class="game-play-space">
+            <canvas id="gameCanvas" width="800" height="600" aria-label="Pac-Man style game"></canvas>
+            <div id="mobileControls" class="mobile-controls" aria-label="Mobile game controls">
+              <button class="dpad-button dpad-up" type="button" data-move="up" aria-label="Move up">↑</button>
+              <button class="dpad-button dpad-left" type="button" data-move="left" aria-label="Move left">←</button>
+              <button class="dpad-button dpad-center" type="button" aria-hidden="true"></button>
+              <button class="dpad-button dpad-right" type="button" data-move="right" aria-label="Move right">→</button>
+              <button class="dpad-button dpad-down" type="button" data-move="down" aria-label="Move down">↓</button>
+            </div>
+          </div>
           <div class="game-controls">
             <button class="ghost-button" type="button" data-back>Back</button>
             <button class="ghost-button" id="exitGameButton" type="button">Exit to Main Page</button>
