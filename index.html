@@ -42,7 +42,7 @@
       <section id="devicePage" class="screen">
         <div class="glass-panel centered-panel">
           <p class="eyebrow">Before the arcade</p>
-          <h2 class="splash-title">Choose your device.<span class="version-splash">v2.0 flash bean</span></h2>
+          <h2 class="splash-title">Choose your device.<span class="version-splash">v3.0 local versus</span></h2>
           <p class="panel-text">Click once to frame a device. Click it again to enter the arcade.</p>
           <div class="device-options">
             <button class="device-card" type="button" data-device="desktop">
@@ -69,7 +69,7 @@
             <span></span>
           </div>
           <p class="eyebrow">Seaside arcade</p>
-          <h2 class="splash-title">Mini Pac<span class="version-splash menu-splash">v2.0 flash bean</span></h2>
+          <h2 class="splash-title">Mini Pac<span class="version-splash menu-splash">v3.0 local versus</span></h2>
           <nav class="vertical-menu" aria-label="Game menu">
             <button type="button" id="storyStartButton">Start Game</button>
             <button type="button" data-go="versusRolePage">Local Versus</button>
@@ -85,42 +85,30 @@
       <section id="versusRolePage" class="screen">
         <div class="select-panel versus-panel">
           <p class="eyebrow">Local versus</p>
-          <h2>Choose Fighters</h2>
+          <h2>Roles</h2>
           <p class="panel-text">Player 1 chooses first. Click once to frame, click again to lock.</p>
-          <div class="versus-duo">
+          <div class="versus-role-arena">
             <article class="player-panel p1-panel active-turn" id="versusP1RolePanel">
               <p class="player-tag">Player 1</p>
-              <div class="versus-role-grid">
-                <button class="versus-choice" type="button" data-versus-player="p1" data-versus-role="pac">
-                  <span class="mini-pac"></span>
-                  <strong>Pac</strong>
-                </button>
-                <button class="versus-choice" type="button" data-versus-player="p1" data-versus-role="ghost">
-                  <span class="mini-ghost blue"></span>
-                  <strong>Ghost</strong>
-                </button>
-                <button class="versus-choice random-choice" type="button" data-versus-player="p1" data-versus-role="random">
-                  <span>∞</span>
-                  <strong>Random</strong>
-                </button>
-              </div>
+              <div class="role-slot" data-role-slot="p1"><span>Waiting</span></div>
             </article>
+            <div class="role-choice-bank" aria-label="Role choices">
+              <button class="versus-choice" type="button" data-versus-role="pac">
+                <span class="mini-pac"></span>
+                <strong>Pac</strong>
+              </button>
+              <button class="versus-choice" type="button" data-versus-role="ghost">
+                <span class="mini-ghost blue"></span>
+                <strong>Ghost</strong>
+              </button>
+              <button class="versus-choice random-choice" type="button" data-versus-role="random">
+                <span class="random-symbol">∞</span>
+                <strong>Random</strong>
+              </button>
+            </div>
             <article class="player-panel p2-panel" id="versusP2RolePanel">
               <p class="player-tag">Player 2</p>
-              <div class="versus-role-grid">
-                <button class="versus-choice" type="button" data-versus-player="p2" data-versus-role="pac">
-                  <span class="mini-pac"></span>
-                  <strong>Pac</strong>
-                </button>
-                <button class="versus-choice" type="button" data-versus-player="p2" data-versus-role="ghost">
-                  <span class="mini-ghost red"></span>
-                  <strong>Ghost</strong>
-                </button>
-                <button class="versus-choice random-choice" type="button" data-versus-player="p2" data-versus-role="random">
-                  <span>∞</span>
-                  <strong>Random</strong>
-                </button>
-              </div>
+              <div class="role-slot" data-role-slot="p2"><span>Waiting</span></div>
             </article>
           </div>
           <div class="actions split-actions">
@@ -156,10 +144,32 @@
           <h2>Map Setup</h2>
           <div class="versus-setup-layout">
             <div class="versus-map-preview">
-              <div class="level-cards compact-levels">
-                <button class="level-card selected" type="button" data-versus-ghosts="1"><strong>Un Ghost</strong></button>
-                <button class="level-card" type="button" data-versus-ghosts="2"><strong>Duo Ghosts</strong></button>
-                <button class="level-card" type="button" data-versus-ghosts="3"><strong>Trios Ghosts</strong></button>
+              <div class="leaderboard-toggle versus-ghost-toggle" aria-label="Versus ghost count">
+                <button class="active" type="button" data-versus-ghosts="1">Un</button>
+                <button type="button" data-versus-ghosts="2">Duo</button>
+                <button type="button" data-versus-ghosts="3">Trios</button>
+              </div>
+              <div class="versus-map-demo" id="versusMapDemo" data-ghosts="1" aria-label="Animated map preview">
+                <span class="maze-wall wall-a"></span>
+                <span class="maze-wall wall-b"></span>
+                <span class="maze-wall wall-c"></span>
+                <span class="maze-wall wall-d"></span>
+                <span class="maze-wall wall-e"></span>
+                <span class="maze-wall wall-f"></span>
+                <span class="maze-wall wall-g"></span>
+                <span class="maze-wall wall-h"></span>
+                <span class="demo-dot dot-one"></span>
+                <span class="demo-dot dot-two"></span>
+                <span class="demo-dot dot-three"></span>
+                <span class="demo-dot dot-four"></span>
+                <span class="demo-dot dot-five"></span>
+                <span class="demo-dot dot-six"></span>
+                <span class="demo-dot dot-seven"></span>
+                <span class="demo-dot dot-eight"></span>
+                <span class="demo-pac"></span>
+                <span class="demo-ghost blue"></span>
+                <span class="demo-ghost red"></span>
+                <span class="demo-ghost yellow"></span>
               </div>
             </div>
             <aside class="versus-options">
@@ -428,6 +438,16 @@
       <h2 id="patchTitle">Version Log</h2>
       <div class="patch-scroll">
         <article class="patch-entry featured-entry">
+          <header>
+            <h3>Version 3.1</h3>
+            <time>May 31, 2026</time>
+          </header>
+          <p>
+            Polished Local Versus setup screens, improved role random animation, refreshed the map preview, and fixed several small visual bugs.
+          </p>
+        </article>
+
+        <article class="patch-entry">
           <header>
             <h3>Version 3.0</h3>
             <time>May 31, 2026</time>

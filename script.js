@@ -83,7 +83,7 @@ const ghostColorValues = {
   green: "#7bd88f",
   cyan: "#43e8d8",
   purple: "#b983ff",
-  violet: "#b983ff",
+  violet: "#e879f9",
 };
 const skinColorValues = {
   red: "#ff4d6d",
@@ -485,15 +485,14 @@ function getVersusGhostPalette() {
 }
 
 function handleVersusRoleClick(button) {
-  const player = button.dataset.versusPlayer;
+  const player = versus.turn;
   const role = button.dataset.versusRole;
-  if (player !== versus.turn || button.disabled) {
+  if (!player || button.disabled) {
     return;
   }
 
   if (role === "random") {
-    assignVersusRandomRoles(player);
-    showScreen("versusSkinPage");
+    runVersusRandomAnimation(player);
     return;
   }
 
@@ -514,7 +513,58 @@ function handleVersusRoleClick(button) {
   updateVersusRoleView();
 }
 
-function assignVersusRandomRoles(player = null) {
+function runVersusRandomAnimation(player) {
+  if (versus.players[player].confirmedRole) {
+    return;
+  }
+
+  const choices = Array.from(versusRoleButtons).filter((button) => !button.disabled);
+  const finalChoices = choices.filter((button) => button.dataset.versusRole !== "random");
+  if (finalChoices.length === 0) {
+    return;
+  }
+
+  versusRoleButtons.forEach((button) => {
+    button.disabled = true;
+    button.classList.remove("selected", "random-cycling");
+  });
+
+  let tick = 0;
+  const cycles = player === "p1" ? 8 : 6;
+  const timer = setInterval(() => {
+    versusRoleButtons.forEach((button) => button.classList.remove("random-cycling"));
+    const button = choices[tick % choices.length];
+    button.classList.add("random-cycling");
+    tick += 1;
+
+    if (tick > cycles) {
+      clearInterval(timer);
+      const chosen = finalChoices[Math.floor(Math.random() * finalChoices.length)].dataset.versusRole;
+      const other = player === "p1" ? "p2" : "p1";
+      if (versus.players[other].confirmedRole && versus.players[other].role) {
+        versus.players[player].role = versus.players[other].role === "pac" ? "ghost" : "pac";
+        versus.players[player].confirmedRole = true;
+        finalizeVersusRoles();
+        updateVersusRoleView();
+        setTimeout(() => showScreen("versusSkinPage"), 420);
+      } else {
+        versus.players[player].role = chosen;
+        versus.players[player].confirmedRole = true;
+        versus.turn = other;
+        updateVersusRoleView();
+        setTimeout(() => {
+          versus.players[other].role = chosen === "pac" ? "ghost" : "pac";
+          versus.players[other].confirmedRole = true;
+          finalizeVersusRoles();
+          updateVersusRoleView();
+          setTimeout(() => showScreen("versusSkinPage"), 420);
+        }, 420);
+      }
+    }
+  }, 115);
+}
+
+function assignVersusRandomRoles(player = null, chosenRole = null) {
   const other = player === "p1" ? "p2" : player === "p2" ? "p1" : null;
   if (player && other && versus.players[other].confirmedRole && versus.players[other].role) {
     versus.players[player].role = versus.players[other].role === "pac" ? "ghost" : "pac";
@@ -523,7 +573,10 @@ function assignVersusRandomRoles(player = null) {
     return;
   }
 
-  if (Math.random() < 0.5) {
+  if (player && other && chosenRole) {
+    versus.players[player].role = chosenRole;
+    versus.players[other].role = chosenRole === "pac" ? "ghost" : "pac";
+  } else if (Math.random() < 0.5) {
     versus.players.p1.role = "pac";
     versus.players.p2.role = "ghost";
   } else {
@@ -543,22 +596,37 @@ function finalizeVersusRoles() {
 function updateVersusRoleView() {
   document.querySelector("#versusP1RolePanel").classList.toggle("active-turn", versus.turn === "p1");
   document.querySelector("#versusP2RolePanel").classList.toggle("active-turn", versus.turn === "p2");
-  versusRoleButtons.forEach((button) => {
-    const player = button.dataset.versusPlayer;
-    const role = button.dataset.versusRole;
-    const other = player === "p1" ? "p2" : "p1";
-    const lockedByOther = role !== "random" && versus.players[other].confirmedRole && versus.players[other].role === role;
-    button.disabled = player !== versus.turn || lockedByOther || versus.players[player].confirmedRole;
-    button.classList.toggle("selected", versus.selected[player] === role || versus.players[player].role === role);
-    button.classList.toggle("disabled-choice", lockedByOther);
+  document.querySelectorAll("[data-role-slot]").forEach((slot) => {
+    const player = slot.dataset.roleSlot;
+    const role = versus.players[player].role;
+    slot.classList.toggle("filled", Boolean(role));
+    slot.classList.toggle("pac-filled", role === "pac");
+    slot.classList.toggle("ghost-filled", role === "ghost");
+    slot.innerHTML = role ? getRoleTokenMarkup(role) : "<span>Waiting</span>";
   });
+  versusRoleButtons.forEach((button) => {
+    const role = button.dataset.versusRole;
+    const lockedByChoice = role !== "random" && Object.values(versus.players).some((player) => player.confirmedRole && player.role === role);
+    const currentPlayerLocked = versus.players[versus.turn]?.confirmedRole;
+    button.disabled = Boolean(currentPlayerLocked || lockedByChoice && role !== "random");
+    button.classList.toggle("selected", versus.selected[versus.turn] === role);
+    button.classList.toggle("disabled-choice", lockedByChoice);
+    button.classList.toggle("locked-role", lockedByChoice);
+  });
+}
+
+function getRoleTokenMarkup(role) {
+  const icon = role === "pac" ? '<span class="mini-pac"></span>' : '<span class="mini-ghost blue"></span>';
+  return `<div class="role-token ${role}-token">${icon}<strong>${role === "pac" ? "Pac" : "Ghost"}</strong></div>`;
 }
 
 function renderVersusSkinChoices() {
   versusSkinGrids.forEach((grid) => {
     const player = grid.dataset.versusSkinGrid;
     const role = versus.players[player].role;
-    const colors = role === "pac" ? Object.keys(skinColorValues) : Object.keys(ghostColorValues);
+    const colors = role === "pac"
+      ? ["red", "yellow", "cyan", "orange", "green", "blue", "purple"]
+      : ["blue", "yellow", "cyan", "red", "green", "orange", "purple", "violet"];
     grid.innerHTML = "";
     grid.closest(".player-panel").classList.toggle("active-turn", !versus.players[player].confirmedSkin);
     colors.forEach((color) => {
@@ -583,7 +651,10 @@ function handleVersusSkinClick(player, color, button) {
     if (versus.players.p1.confirmedSkin && versus.players.p2.confirmedSkin) {
       applyVersusDefaults();
       updateVersusSettingsView();
-      showScreen("versusSetupPage");
+      renderVersusSkinChoices();
+      setTimeout(() => {
+        showScreen("versusSetupPage");
+      }, 520);
       return;
     }
   } else {
@@ -601,8 +672,17 @@ function applyVersusDefaults() {
 
 function updateVersusSettingsView() {
   const disabled = versus.rulesMode !== "custom";
+  const mapDemo = document.querySelector("#versusMapDemo");
+  if (mapDemo) {
+    mapDemo.classList.remove("preview-reset");
+    void mapDemo.offsetWidth;
+    mapDemo.setAttribute("data-ghosts", String(versus.ghostCount));
+    mapDemo.classList.add("preview-reset");
+  }
   versusGhostButtons.forEach((button) => {
-    button.classList.toggle("selected", Number(button.dataset.versusGhosts) === versus.ghostCount);
+    const active = Number(button.dataset.versusGhosts) === versus.ghostCount;
+    button.classList.toggle("selected", active);
+    button.classList.toggle("active", active);
   });
   versusRuleButtons.forEach((button) => {
     button.classList.toggle("active", button.dataset.versusRules === versus.rulesMode);
