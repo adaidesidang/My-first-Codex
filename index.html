@@ -7,6 +7,9 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <button class="language-toggle" id="languageToggle" type="button" aria-label="Switch language">
+    <span data-lang-side="en">Eng</span><i>/</i><span data-lang-side="zh">中</span>
+  </button>
   <div class="site-shell">
     <main>
       <section id="homePage" class="screen active">
@@ -42,7 +45,7 @@
       <section id="devicePage" class="screen">
         <div class="glass-panel centered-panel">
           <p class="eyebrow">Before the arcade</p>
-          <h2 class="splash-title">Choose your device.<span class="version-splash">v3.0 local versus</span></h2>
+          <h2 class="splash-title"><span class="splash-main">Choose your device.</span><span class="version-splash">v4.0 chinese language</span></h2>
           <p class="panel-text">Click once to frame a device. Click it again to enter the arcade.</p>
           <div class="device-options">
             <button class="device-card" type="button" data-device="desktop">
@@ -60,6 +63,40 @@
         </div>
       </section>
 
+      <section id="orientationPage" class="screen">
+        <div class="glass-panel orientation-panel">
+          <p class="eyebrow">Mobile layout</p>
+          <h2>Landscape / Portrait</h2>
+          <p class="panel-text">Pick the layout you want to use on mobile. This manual choice stays stable even if browser detection is imperfect.</p>
+          <div class="orientation-options">
+            <button class="orientation-card" type="button" data-orientation-choice="landscape">
+              <strong>Landscape</strong>
+              <span class="orientation-sketch landscape-sketch">
+                <i class="sketch-score p1"></i>
+                <i class="sketch-game"></i>
+                <i class="sketch-controls c1"></i>
+                <i class="sketch-controls c2"></i>
+                <em>Game</em>
+              </span>
+            </button>
+            <button class="orientation-card" type="button" data-orientation-choice="portrait">
+              <strong>Portrait</strong>
+              <span class="orientation-sketch portrait-sketch">
+                <i class="sketch-single"></i>
+                <i class="sketch-duo"></i>
+                <i class="sketch-game"></i>
+                <i class="sketch-controls c1"></i>
+                <i class="sketch-controls c2"></i>
+                <em>Solo / Duo</em>
+              </span>
+            </button>
+          </div>
+          <div class="actions split-actions">
+            <button class="ghost-button" type="button" data-back>Back</button>
+          </div>
+        </div>
+      </section>
+
       <section id="gameMenuPage" class="screen">
         <div class="menu-panel">
           <button class="patch-button" id="patchNotesButton" type="button" aria-label="Open version notes">
@@ -69,7 +106,7 @@
             <span></span>
           </div>
           <p class="eyebrow">Seaside arcade</p>
-          <h2 class="splash-title">Mini Pac<span class="version-splash menu-splash">v3.0 local versus</span></h2>
+          <h2 class="splash-title">Mini Pac<span class="version-splash menu-splash">v4.0 chinese language</span></h2>
           <nav class="vertical-menu" aria-label="Game menu">
             <button type="button" id="storyStartButton">Start Game</button>
             <button type="button" data-go="versusRolePage">Local Versus</button>
@@ -438,6 +475,19 @@
       <h2 id="patchTitle">Version Log</h2>
       <div class="patch-scroll">
         <article class="patch-entry featured-entry">
+          <header>
+            <h3>Version 4.0</h3>
+            <time>May 31, 2026</time>
+          </header>
+          <p>
+            Added Chinese language support and a manual mobile layout choice for landscape and portrait play.
+          </p>
+          <p>
+            Local Versus mobile layouts now separate each player&apos;s score and controls more clearly for shared-screen play.
+          </p>
+        </article>
+
+        <article class="patch-entry">
           <header>
             <h3>Version 3.1</h3>
             <time>May 31, 2026</time>

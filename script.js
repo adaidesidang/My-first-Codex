@@ -2,6 +2,7 @@ const screens = {
   homePage: document.querySelector("#homePage"),
   invitePage: document.querySelector("#invitePage"),
   devicePage: document.querySelector("#devicePage"),
+  orientationPage: document.querySelector("#orientationPage"),
   gameMenuPage: document.querySelector("#gameMenuPage"),
   versusRolePage: document.querySelector("#versusRolePage"),
   versusSkinPage: document.querySelector("#versusSkinPage"),
@@ -34,6 +35,7 @@ const patchNotesButton = document.querySelector("#patchNotesButton");
 const patchModal = document.querySelector("#patchModal");
 const patchCloseButton = document.querySelector("#patchCloseButton");
 const patchScroll = document.querySelector(".patch-scroll");
+const languageToggle = document.querySelector("#languageToggle");
 const mobileAbilityButton = document.querySelector("#mobileAbilityButton");
 const mobileAbilityButtons = document.querySelectorAll("[data-mobile-ability]");
 const mobilePowerCount = document.querySelector("#mobilePowerCount");
@@ -51,6 +53,7 @@ const resultStage = document.querySelector("#resultStage");
 const levelCards = document.querySelectorAll("[data-ghost-select]");
 const roleCards = document.querySelectorAll("[data-role-select]");
 const deviceButtons = document.querySelectorAll("[data-device]");
+const orientationButtons = document.querySelectorAll("[data-orientation-choice]");
 const moveButtons = document.querySelectorAll("[data-move]");
 const skinCards = document.querySelectorAll("[data-skin]");
 const ghostSkinCards = document.querySelectorAll("[data-ghost-skin]");
@@ -141,6 +144,9 @@ let selectedGhostCount = null;
 let selectedRoleChoice = null;
 let selectedDeviceChoice = null;
 let selectedDevice = localStorage.getItem("miniPacDevice") || "desktop";
+let selectedMobileOrientation = localStorage.getItem("miniPacOrientation") || "auto";
+let selectedOrientationChoice = null;
+let currentLanguage = localStorage.getItem("miniPacLanguage") || "en";
 let selectedSkin = localStorage.getItem("miniPacSkin") || "yellow";
 let selectedGhostSkin = localStorage.getItem("miniPacGhostSkin") || "blue";
 const versus = {
@@ -177,9 +183,226 @@ const mapPools = {
   3: shuffle([...Array(10).keys()]),
 };
 
+const translations = {
+  ".home-card .eyebrow": { en: "Bonjour / Hello / 你好", zh: "Bonjour / Hello / 你好" },
+  ".home-card h1 span:nth-child(1)": { en: "My", zh: "我的" },
+  ".home-card h1 span:nth-child(2)": { en: "First", zh: "第一个" },
+  ".home-card h1 span:nth-child(3)": { en: "Website", zh: "网站" },
+  ".summary": { en: "A quiet digital space for ideas, code, and small beginnings.", zh: "一个安静的数字空间，用来放想法、代码和小小的开始。" },
+  ".note": { en: "Built with clarity. Styled with calm.", zh: "清晰地构建，安静地呈现。" },
+  "[data-go='invitePage']": { en: "Enter", zh: "进入" },
+  "#invitePage .eyebrow": { en: "A small detour", zh: "一段小小的绕路" },
+  "#invitePage h2": { en: "Do you want to play a little game?", zh: "想玩一个小游戏吗？" },
+  "#invitePage .panel-text": { en: "Un petit jeu by the sea, made for one quiet glowing screen.", zh: "一个海边小游戏，为一块安静发光的屏幕而做。" },
+  "#devicePage .eyebrow": { en: "Before the arcade", zh: "进入游戏厅前" },
+  "#devicePage .splash-main": { en: "Choose your device.", zh: "选择你的设备。" },
+  "#devicePage .version-splash": { en: "v4.0 chinese language", zh: "v4.0新语言：中文" },
+  "#devicePage .panel-text": { en: "Click once to frame a device. Click it again to enter the arcade.", zh: "单击选择设备，再点一次进入游戏厅。" },
+  "[data-device='desktop'] strong": { en: "Desktop", zh: "电脑端" },
+  "[data-device='mobile'] strong": { en: "Mobile", zh: "移动端" },
+  "#orientationPage .eyebrow": { en: "Mobile layout", zh: "移动端布局" },
+  "#orientationPage h2": { en: "Landscape / Portrait", zh: "横屏 / 竖屏" },
+  "#orientationPage .panel-text": { en: "Pick the layout you want to use on mobile. This manual choice stays stable even if browser detection is imperfect.", zh: "选择移动端游玩布局。即使浏览器横竖屏检测不稳定，手动选择也会保持生效。" },
+  "[data-orientation-choice='landscape'] strong": { en: "Landscape", zh: "横屏" },
+  "[data-orientation-choice='portrait'] strong": { en: "Portrait", zh: "竖屏" },
+  ".landscape-sketch em": { en: "Game", zh: "游戏内容" },
+  ".portrait-sketch em": { en: "Solo / Duo", zh: "单人 / 双人" },
+  "#gameMenuPage .eyebrow": { en: "Seaside arcade", zh: "海边游戏厅" },
+  "#gameMenuPage .version-splash": { en: "v4.0 chinese language", zh: "v4.0新语言：中文" },
+  "#storyStartButton": { en: "Start Game", zh: "开始游戏" },
+  "[data-go='versusRolePage']": { en: "Local Versus", zh: "本地双人" },
+  "[data-go='leaderboardPage']": { en: "Leaderboard", zh: "排行榜" },
+  "#selectModeButton": { en: "Select Level", zh: "选择关卡" },
+  "[data-go='skinsPage']": { en: "Skins", zh: "皮肤" },
+  "[data-go='creditsPage']": { en: "Credits", zh: "制作名单" },
+  ".lower-back": { en: "Back", zh: "返回" },
+  "#versusRolePage .eyebrow": { en: "Local versus", zh: "本地双人" },
+  "#versusRolePage h2": { en: "Roles", zh: "角色" },
+  "#versusRolePage .panel-text": { en: "Player 1 chooses first. Click once to frame, click again to lock.", zh: "玩家 1 先选。单击出现选框，再点一次锁定。" },
+  "#versusP1RolePanel .player-tag": { en: "Player 1", zh: "玩家 1" },
+  "#versusP2RolePanel .player-tag": { en: "Player 2", zh: "玩家 2" },
+  "[data-versus-role='pac'] strong": { en: "Pac", zh: "吃豆人" },
+  "[data-versus-role='ghost'] strong": { en: "Ghost", zh: "幽灵" },
+  "[data-versus-role='random'] strong": { en: "Random", zh: "随机" },
+  "#versusSkinPage .eyebrow": { en: "Local versus", zh: "本地双人" },
+  "#versusSkinPage h2": { en: "Choose Skins", zh: "选择皮肤" },
+  "#versusSkinPage .panel-text": { en: "Both players lock a skin before setup.", zh: "两位玩家都锁定皮肤后进入地图设置。" },
+  "#versusP1SkinPanel .player-tag": { en: "Player 1", zh: "玩家 1" },
+  "#versusP2SkinPanel .player-tag": { en: "Player 2", zh: "玩家 2" },
+  "#versusSetupPage .eyebrow": { en: "Local versus", zh: "本地双人" },
+  "#versusSetupPage h2": { en: "Map Setup", zh: "地图设置" },
+  "[data-versus-rules='default']": { en: "Default", zh: "默认" },
+  "[data-versus-rules='custom']": { en: "Customize", zh: "自定义" },
+  "[data-setting-row='power'] b": { en: "Power Bean", zh: "道具豆" },
+  "[data-setting-row='flash'] b": { en: "Flash", zh: "闪电" },
+  "[data-setting-row='portal'] b": { en: "Portal", zh: "传送门" },
+  "[data-setting-row='time'] b": { en: "Time", zh: "时间" },
+  "#versusStartButton": { en: "Start Versus", zh: "开始双人" },
+  "#roleSelectPage .eyebrow": { en: "Role select", zh: "角色选择" },
+  "#roleSelectPage h2": { en: "Choose Your Side", zh: "选择你的阵营" },
+  "#roleSelectPage .panel-text": { en: "Click once to frame a role. Click the same card again to continue.", zh: "单击选择角色，再点同一张卡继续。" },
+  "[data-role-select='pac'] strong": { en: "Pac Mode", zh: "吃豆人模式" },
+  "[data-role-select='ghost'] strong": { en: "Ghost Mode", zh: "幽灵模式" },
+  "#levelSelectPage .eyebrow": { en: "Manual mode", zh: "自由选择" },
+  "#levelSelectPage h2": { en: "Select Level", zh: "选择关卡" },
+  "#levelSelectPage .panel-text": { en: "Click once to frame a card. Click the same card again to begin.", zh: "单击选择卡片，再点同一张卡开始。" },
+  "#skinsPage .eyebrow": { en: "Choose a glow", zh: "选择光色" },
+  "#skinsPage h2": { en: "Skins", zh: "皮肤" },
+  "#skinsPage .panel-text": { en: "Pick colors for Pac Mode and your playable ghost in Ghost Mode.", zh: "选择吃豆人模式颜色，以及幽灵模式中你控制的幽灵颜色。" },
+  "#skinsPage .skin-label:nth-of-type(1)": { en: "Pac Skin", zh: "吃豆人皮肤" },
+  "#skinsPage .skin-label:nth-of-type(2)": { en: "Ghost Skin", zh: "幽灵皮肤" },
+  "#countdownPage .panel-text": { en: "The tide is pulling the maze into place.", zh: "海潮正在把迷宫推到正确的位置。" },
+  "#gameModeLabel": { en: "Ocean maze", zh: "海边迷宫" },
+  ".scoreboard:first-child span": { en: "Score", zh: "分数" },
+  ".scoreboard:last-child span": { en: "Ghosts", zh: "幽灵" },
+  "#exitGameButton": { en: "Exit to Main Page", zh: "退出到主页面" },
+  "#resetButton": { en: "Reset", zh: "重置" },
+  "#gameStatus": { en: "Use arrow keys or WASD.", zh: "使用方向键或 WASD 移动。" },
+  "#leaderboardPage .eyebrow": { en: "Best runs", zh: "最佳记录" },
+  "#leaderboardPage h2": { en: "Leaderboard", zh: "排行榜" },
+  "[data-leaderboard-mode='pac']": { en: "Pac", zh: "吃豆人" },
+  "[data-leaderboard-mode='ghost']": { en: "Ghost", zh: "幽灵" },
+  "#creditsPage .eyebrow": { en: "Credits", zh: "制作名单" },
+  "#creditsPage h2": { en: "Created by", zh: "创作者" },
+  "#creditsPage .panel-text": { en: "Design, code, and seaside arcade mood.", zh: "设计、代码，以及海边游戏厅的氛围。" },
+  "#patchModal .eyebrow": { en: "Update Notes", zh: "更新公告" },
+  "#patchTitle": { en: "Version Log", zh: "版本记录" },
+  ".patch-entry:nth-of-type(1) h3": { en: "Version 4.0", zh: "版本 4.0" },
+  ".patch-entry:nth-of-type(1) p:nth-of-type(1)": { en: "Added Chinese language support and a manual mobile layout choice for landscape and portrait play.", zh: "新增中文语言支持，并为移动端加入横屏/竖屏手动布局选择。" },
+  ".patch-entry:nth-of-type(1) p:nth-of-type(2)": { en: "Local Versus mobile layouts now separate each player's score and controls more clearly for shared-screen play.", zh: "本地双人移动端布局现在会更清楚地区分两位玩家的计分板和操作区。" },
+  ".patch-entry:nth-of-type(2) h3": { en: "Version 3.1", zh: "版本 3.1" },
+  ".patch-entry:nth-of-type(2) p": { en: "Polished Local Versus setup screens, improved role random animation, refreshed the map preview, and fixed several small visual bugs.", zh: "打磨本地双人设置界面，优化随机角色动画，更新地图预览，并修复一些小的视觉问题。" },
+  ".patch-entry:nth-of-type(3) h3": { en: "Version 3.0", zh: "版本 3.0" },
+  ".patch-entry:nth-of-type(3) p:nth-of-type(1)": { en: "Added Local Versus, a same-device two-player mode with role select, skin select, and customizable map rules.", zh: "新增本地双人模式，可在同一设备上选择角色、皮肤，并自定义地图规则。" },
+  ".patch-entry:nth-of-type(3) p:nth-of-type(2)": { en: "Player 1 uses WASD and Q. Player 2 uses arrow keys and / or ?. Versus scores are kept out of leaderboard.", zh: "玩家 1 使用 WASD 和 Q。玩家 2 使用方向键和 / 或 ?。双人分数不会写入排行榜。" },
+  ".patch-entry:nth-of-type(4) h3": { en: "Version 2.3", zh: "版本 2.3" },
+  ".patch-entry:nth-of-type(4) p:nth-of-type(1)": { en: "Added a smoother animated leaderboard switch, French-styled level labels, and sharper AI Pac routing in Duo and Trios Ghost maps.", zh: "新增更顺滑的排行榜切换、法语风格关卡标签，并强化双幽灵和三幽灵地图中的 AI 吃豆人路线。" },
+  ".patch-entry:nth-of-type(4) p:nth-of-type(2)": { en: "Ghost Mode now gives AI Pac one Power Bean in every map size, keeping the hunt fair but active.", zh: "幽灵模式中，AI 吃豆人在每种地图尺寸都会获得一个道具豆，让追捕更公平也更活跃。" },
+  ".patch-entry:nth-of-type(5) h3": { en: "Version 2.2", zh: "版本 2.2" },
+  ".patch-entry:nth-of-type(5) p:nth-of-type(1)": { en: "Added Ghost Skin selection and a new wormhole anti-blocking rule for Ghost Mode. If the player ghost holds one tile too long, it is pulled into a deep-blue portal.", zh: "新增幽灵皮肤选择，并为幽灵模式加入传送门防堵路规则。如果玩家幽灵在同一格停留太久，会被拉入深蓝传送门。" },
+  ".patch-entry:nth-of-type(5) p:nth-of-type(2)": { en: "Flash scoreboard animation now lasts longer, and portals move the player ghost to the hole farthest from Pac with a short mist-and-particle teleport effect.", zh: "闪电计分板动画持续更久，传送门会把玩家幽灵送到离吃豆人最远的洞口，并带有短暂雾气粒子特效。" },
+  ".patch-entry:nth-of-type(6) h3": { en: "Version 2.1", zh: "版本 2.1" },
+  ".patch-entry:nth-of-type(6) p:nth-of-type(1)": { en: "Tuned Ghost Mode pacing with a clearer countdown, Pac-first bean chasing, and two-page leaderboards for Pac and Ghost records.", zh: "调整幽灵模式节奏，加入更清楚的倒计时、优先吃豆的 AI 吃豆人，以及吃豆人和幽灵两页排行榜。" },
+  ".patch-entry:nth-of-type(6) p:nth-of-type(2)": { en: "Flash Bean now belongs only to the player ghost, dashes four tiles with a color afterimage, and shows a small golden lightning mark during the dash.", zh: "闪电豆现在只属于玩家幽灵，可冲刺四格并留下同色残影，冲刺时头上会出现小金色闪电。" },
+  ".patch-entry:nth-of-type(7) h3": { en: "Version 2.0", zh: "版本 2.0" },
+  ".patch-entry:nth-of-type(7) p:nth-of-type(1)": { en: "Added Ghost Mode, a new role where the player controls the lead ghost and hunts an AI Pac. The Pac still focuses on clearing beans, but uses cautious pathing when a ghost gets too close.", zh: "新增幽灵模式，玩家控制主幽灵追捕 AI 吃豆人。吃豆人仍以清豆为目标，但幽灵靠近时会更谨慎地走位。" },
+  ".patch-entry:nth-of-type(7) p:nth-of-type(2)": { en: "Added Flash Bean, a ghost-only item for the player ghost. It uses the same X / center-button input as Power Bean, but turns that input into a short directional dash.", zh: "新增闪电豆，这是玩家幽灵专属道具。它使用与道具豆相同的 X / 中间按钮输入，但效果是短距离方向冲刺。" },
+  ".patch-entry:nth-of-type(8) h3": { en: "Version 1.2", zh: "版本 1.2" },
+  ".patch-entry:nth-of-type(8) p:nth-of-type(1)": { en: "Improved three-ghost chase behavior. Ghosts now hold straight-line pursuit more consistently without increasing their movement speed.", zh: "优化三幽灵追捕行为。幽灵现在能更稳定地保持直线追击，同时不提高移动速度。" },
+  ".patch-entry:nth-of-type(8) p:nth-of-type(2)": { en: "Added a small pressure-balance adjustment for rare close-chase situations, plus minor gameplay refinements.", zh: "为少见的近距离围追情况加入轻微压力平衡，并做了一些玩法细节优化。" },
+  ".patch-entry:nth-of-type(9) h3": { en: "Version 1.1", zh: "版本 1.1" },
+  ".patch-entry:nth-of-type(9) p:nth-of-type(1)": { en: "Power phase time now scales by difficulty: two-ghost mode lasts 7.5s, and three-ghost mode lasts 8s.", zh: "道具虚化时间现在会随难度变化：双幽灵为 7.5 秒，三幽灵为 8 秒。" },
+  ".patch-entry:nth-of-type(9) p:nth-of-type(2)": { en: "One-ghost maps now have a 50 percent chance to include one power bean. Scoreboard power tracking, device selection, and small gameplay details were polished.", zh: "单幽灵地图现在有 50% 概率出现一个道具豆。计分板道具追踪、设备选择和一些玩法细节也进行了打磨。" },
+  ".patch-entry:nth-of-type(10) h3": { en: "Version 1.0", zh: "版本 1.0" },
+  ".patch-entry:nth-of-type(10) p:nth-of-type(1)": { en: "A night-blue power bean now appears in harder mazes. Eat it, then press X on desktop or tap the center mobile button to phase a nearby ghost.", zh: "更难的迷宫中会出现暗夜亮蓝道具豆。吃掉后，在电脑端按 X，或在移动端点击中间按钮，即可虚化附近幽灵。" },
+  ".patch-entry:nth-of-type(10) p:nth-of-type(2)": { en: "The beam checks up to seven open tiles in the four straight directions. Walls block it. A phased ghost turns misty, slows down, and drifts for seven seconds.", zh: "光束会检测上下左右四个方向最多七格的开放空间，墙会阻挡它。被虚化的幽灵会变成雾白、减速，并漂移七秒。" },
+  ".patch-close": { en: "×", zh: "×" },
+};
+
+const wordMap = {
+  en: {
+    back: "Back",
+    enterMenu: "Enter Menu",
+    waiting: "Waiting",
+    player1: "Player 1",
+    player2: "Player 2",
+    pac: "Pac",
+    ghost: "Ghost",
+    ghosts: "Ghosts",
+    story: "Story",
+    manual: "Manual",
+    victory: "Victory",
+    gameOver: "Game Over",
+    restart: "Restart",
+    rematch: "Rematch",
+    continue: "Continue to Next Level",
+    main: "Back to Main Page",
+    beautifulRun: "Beautiful run.",
+    tideTook: "The tide took this one.",
+    caught: "Caught in the tide.",
+    pacSlipped: "Pac slipped away.",
+    noPacScores: "No Pac scores yet. Start the first run.",
+    noGhostScores: "No ghost runs yet. Start the first hunt.",
+    colors: { red: "Red", orange: "Orange", yellow: "Yellow", green: "Green", cyan: "Cyan", blue: "Blue", purple: "Purple", violet: "Violet" },
+  },
+  zh: {
+    back: "返回",
+    enterMenu: "进入菜单",
+    waiting: "等待中",
+    player1: "玩家 1",
+    player2: "玩家 2",
+    pac: "吃豆人",
+    ghost: "幽灵",
+    ghosts: "幽灵",
+    story: "剧情",
+    manual: "自由",
+    victory: "胜利",
+    gameOver: "游戏结束",
+    restart: "重新开始",
+    rematch: "再来一局",
+    continue: "继续下一关",
+    main: "返回主页面",
+    beautifulRun: "漂亮的一局。",
+    tideTook: "这次被海潮带走了。",
+    caught: "抓到了。",
+    pacSlipped: "吃豆人逃走了。",
+    noPacScores: "还没有吃豆人记录。开始第一局吧。",
+    noGhostScores: "还没有幽灵记录。开始第一次追捕吧。",
+    colors: { red: "红色", orange: "橙色", yellow: "黄色", green: "绿色", cyan: "青色", blue: "蓝色", purple: "紫色", violet: "紫罗兰" },
+  },
+};
+
+function tr(key) {
+  return wordMap[currentLanguage][key] || wordMap.en[key] || key;
+}
+
+function applyLanguage() {
+  document.documentElement.lang = currentLanguage === "zh" ? "zh-CN" : "en";
+  document.body.classList.toggle("zh-language", currentLanguage === "zh");
+  languageToggle?.classList.toggle("zh-active", currentLanguage === "zh");
+  Object.entries(translations).forEach(([selector, values]) => {
+    document.querySelectorAll(selector).forEach((node) => {
+      node.textContent = values[currentLanguage] || values.en;
+    });
+  });
+  document.querySelectorAll("[data-back]").forEach((button) => {
+    button.textContent = tr("back");
+  });
+  document.querySelectorAll("[data-go='gameMenuPage']").forEach((button) => {
+    button.textContent = tr("enterMenu");
+  });
+  const skinLabels = document.querySelectorAll("#skinsPage .skin-label");
+  if (skinLabels[0]) skinLabels[0].textContent = currentLanguage === "zh" ? "吃豆人皮肤" : "Pac Skin";
+  if (skinLabels[1]) skinLabels[1].textContent = currentLanguage === "zh" ? "幽灵皮肤" : "Ghost Skin";
+  renderColorLabels();
+  updateDynamicLanguageText();
+}
+
+function renderColorLabels() {
+  document.querySelectorAll("[data-skin], [data-ghost-skin]").forEach((button) => {
+    const color = button.dataset.skin || button.dataset.ghostSkin;
+    const label = button.querySelector("strong");
+    if (label) {
+      label.textContent = wordMap[currentLanguage].colors[color] || color;
+    }
+  });
+}
+
+function updateDynamicLanguageText() {
+  if (screens.leaderboardPage.classList.contains("active")) {
+    renderLeaderboard();
+  }
+  if (screens.versusRolePage.classList.contains("active")) {
+    updateVersusRoleView();
+  }
+  if (screens.versusSkinPage.classList.contains("active")) {
+    renderVersusSkinChoices();
+  }
+}
+
 function showScreen(screenId, addToHistory = true) {
   if (screenId !== "gamePage" && gameRunning) {
-    pauseGame("Paused. Return to the maze when you are ready.");
+    pauseGame(currentLanguage === "zh" ? "已暂停。准备好后可以回到迷宫。" : "Paused. Return to the maze when you are ready.");
   }
 
   Object.values(screens).forEach((screen) => screen.classList.remove("active"));
@@ -198,6 +421,11 @@ function showScreen(screenId, addToHistory = true) {
     deviceButtons.forEach((button) => button.classList.remove("selected"));
   }
 
+  if (screenId === "orientationPage") {
+    selectedOrientationChoice = null;
+    orientationButtons.forEach((button) => button.classList.remove("selected"));
+  }
+
   if (screenId === "roleSelectPage") {
     selectedRoleChoice = null;
     roleCards.forEach((button) => button.classList.remove("selected"));
@@ -214,6 +442,8 @@ function showScreen(screenId, addToHistory = true) {
   if (screenId === "gamePage") {
     drawGame();
   }
+
+  applyLanguage();
 }
 
 function goBack() {
@@ -236,18 +466,39 @@ document.querySelectorAll("[data-back]").forEach((button) => {
   button.addEventListener("click", goBack);
 });
 
+languageToggle?.addEventListener("click", () => {
+  currentLanguage = currentLanguage === "en" ? "zh" : "en";
+  localStorage.setItem("miniPacLanguage", currentLanguage);
+  applyLanguage();
+});
+
 deviceButtons.forEach((button) => {
   button.addEventListener("click", () => {
     const device = button.dataset.device;
 
     if (selectedDeviceChoice === device && button.classList.contains("selected")) {
       setDeviceMode(device);
-      showScreen("gameMenuPage");
+      showScreen(device === "mobile" ? "orientationPage" : "gameMenuPage");
       return;
     }
 
     selectedDeviceChoice = device;
     deviceButtons.forEach((item) => item.classList.remove("selected"));
+    button.classList.add("selected");
+  });
+});
+
+orientationButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    const orientation = button.dataset.orientationChoice;
+    if (selectedOrientationChoice === orientation && button.classList.contains("selected")) {
+      setMobileOrientation(orientation);
+      showScreen("gameMenuPage");
+      return;
+    }
+
+    selectedOrientationChoice = orientation;
+    orientationButtons.forEach((item) => item.classList.remove("selected"));
     button.classList.add("selected");
   });
 });
@@ -308,7 +559,7 @@ resetButton.addEventListener("click", () => {
 });
 
 exitGameButton.addEventListener("click", () => {
-  pauseGame("Exited to the arcade menu.");
+  pauseGame(currentLanguage === "zh" ? "已退出到游戏菜单。" : "Exited to the arcade menu.");
   versusMode = false;
   document.body.classList.remove("versus-mode");
   historyStack.length = 0;
@@ -419,11 +670,27 @@ versusStartButton.addEventListener("click", () => {
   startVersusCountdown();
 });
 
+window.addEventListener("resize", syncDetectedOrientation);
+window.addEventListener("orientationchange", syncDetectedOrientation);
+
 function setDeviceMode(device) {
   selectedDevice = device;
   localStorage.setItem("miniPacDevice", device);
   document.body.classList.toggle("mobile-mode", device === "mobile");
   document.body.classList.toggle("desktop-mode", device !== "mobile");
+}
+
+function setMobileOrientation(orientation) {
+  selectedMobileOrientation = orientation;
+  localStorage.setItem("miniPacOrientation", orientation);
+  document.body.classList.toggle("manual-landscape", orientation === "landscape");
+  document.body.classList.toggle("manual-portrait", orientation === "portrait");
+}
+
+function syncDetectedOrientation() {
+  const landscape = window.innerWidth > window.innerHeight;
+  document.body.classList.toggle("detected-landscape", landscape);
+  document.body.classList.toggle("detected-portrait", !landscape);
 }
 
 function setSkin(skin) {
@@ -602,7 +869,7 @@ function updateVersusRoleView() {
     slot.classList.toggle("filled", Boolean(role));
     slot.classList.toggle("pac-filled", role === "pac");
     slot.classList.toggle("ghost-filled", role === "ghost");
-    slot.innerHTML = role ? getRoleTokenMarkup(role) : "<span>Waiting</span>";
+    slot.innerHTML = role ? getRoleTokenMarkup(role) : `<span>${tr("waiting")}</span>`;
   });
   versusRoleButtons.forEach((button) => {
     const role = button.dataset.versusRole;
@@ -617,7 +884,7 @@ function updateVersusRoleView() {
 
 function getRoleTokenMarkup(role) {
   const icon = role === "pac" ? '<span class="mini-pac"></span>' : '<span class="mini-ghost blue"></span>';
-  return `<div class="role-token ${role}-token">${icon}<strong>${role === "pac" ? "Pac" : "Ghost"}</strong></div>`;
+  return `<div class="role-token ${role}-token">${icon}<strong>${role === "pac" ? tr("pac") : tr("ghost")}</strong></div>`;
 }
 
 function renderVersusSkinChoices() {
@@ -635,7 +902,7 @@ function renderVersusSkinChoices() {
       button.type = "button";
       button.classList.toggle("selected", versus.players[player].skin === color);
       button.style.setProperty("--skin-color", role === "pac" ? skinColorValues[color] : ghostColorValues[color]);
-      button.innerHTML = `<span></span><strong>${color[0].toUpperCase()}${color.slice(1)}</strong>`;
+      button.innerHTML = `<span></span><strong>${wordMap[currentLanguage].colors[color] || color}</strong>`;
       button.addEventListener("click", () => handleVersusSkinClick(player, color, button));
       grid.appendChild(button);
     });
@@ -724,8 +991,9 @@ function startCountdown(ghostCount, runType, role = currentRole) {
   currentGhostCount = ghostCount;
   currentRunType = runType;
   currentRole = role;
-  const roleLabel = role === "ghost" ? "Ghost Mode" : "Pac Mode";
-  countdownMode.textContent = `${roleLabel} / ${runType} / ${ghostCount} ${ghostCount === 1 ? "Ghost" : "Ghosts"}`;
+  const roleLabel = role === "ghost" ? (currentLanguage === "zh" ? "幽灵模式" : "Ghost Mode") : (currentLanguage === "zh" ? "吃豆人模式" : "Pac Mode");
+  const runLabel = runType === "Story" ? tr("story") : tr("manual");
+  countdownMode.textContent = `${roleLabel} / ${runLabel} / ${ghostCount} ${tr("ghosts")}`;
   showScreen("countdownPage");
 
   let number = 3;
@@ -738,7 +1006,7 @@ function startCountdown(ghostCount, runType, role = currentRole) {
     }
 
     clearInterval(timer);
-    countdownNumber.textContent = "Go";
+    countdownNumber.textContent = currentLanguage === "zh" ? "开始" : "Go";
     setTimeout(() => {
       prepareGame(ghostCount, runType, role);
       if (historyStack[historyStack.length - 1] === "countdownPage") {
@@ -828,8 +1096,9 @@ function prepareGame(ghostCount, runType, role = currentRole) {
   updateScore();
   updateTimerDisplay();
   ghostCountValue.textContent = ghostCount;
-  const roleLabel = role === "ghost" ? "Ghost Hunt" : "Ocean Maze";
-  gameModeLabel.textContent = `${roleLabel} / ${runType} / Map ${currentMapIndex + 1} / ${ghostCount} ${ghostCount === 1 ? "Ghost" : "Ghosts"}`;
+  const roleLabel = role === "ghost" ? (currentLanguage === "zh" ? "幽灵追捕" : "Ghost Hunt") : (currentLanguage === "zh" ? "海边迷宫" : "Ocean Maze");
+  const runLabel = runType === "Story" ? tr("story") : tr("manual");
+  gameModeLabel.textContent = `${roleLabel} / ${runLabel} / ${currentLanguage === "zh" ? "地图" : "Map"} ${currentMapIndex + 1} / ${ghostCount} ${tr("ghosts")}`;
   statusText.textContent = getControlHint();
   drawGame();
 }
@@ -847,7 +1116,7 @@ function startVersusCountdown() {
   currentRole = "versus";
   currentRunType = "Local Versus";
   currentGhostCount = versus.ghostCount;
-  countdownMode.textContent = `Local Versus / ${versus.ghostCount} ${versus.ghostCount === 1 ? "Ghost" : "Ghosts"}`;
+  countdownMode.textContent = `${currentLanguage === "zh" ? "本地双人" : "Local Versus"} / ${versus.ghostCount} ${tr("ghosts")}`;
   showScreen("countdownPage");
 
   let number = 3;
@@ -861,7 +1130,7 @@ function startVersusCountdown() {
     }
 
     clearInterval(timer);
-    countdownNumber.textContent = "Go";
+    countdownNumber.textContent = currentLanguage === "zh" ? "开始" : "Go";
     setTimeout(() => {
       countdownNumber.classList.remove("versus-countdown");
       startVersusGame();
@@ -937,9 +1206,9 @@ function startVersusGame() {
   placeExactItemsForFlash(versus.settings.flash);
   placeExactPortals(versus.settings.portal);
   totalPellets = pellets.size;
-  gameModeLabel.textContent = `Local Versus / Map ${currentMapIndex + 1}`;
+  gameModeLabel.textContent = `${currentLanguage === "zh" ? "本地双人" : "Local Versus"} / ${currentLanguage === "zh" ? "地图" : "Map"} ${currentMapIndex + 1}`;
   ghostCountValue.textContent = versus.ghostCount;
-  statusText.textContent = "P1: WASD + Q. P2: Arrows + / or ?";
+  statusText.textContent = currentLanguage === "zh" ? "玩家1：WASD + Q。玩家2：方向键 + / 或 ?" : "P1: WASD + Q. P2: Arrows + / or ?";
   updateVersusScore();
   updateTimerDisplay();
   showScreen("gamePage");
@@ -988,8 +1257,12 @@ function updateVersusScore() {
   const p1Inventory = versus.players.p1.role === "pac" ? versus.pacPower - versus.pacPowerUsed : versus.ghostFlash - versus.ghostFlashUsed;
   const p2Inventory = versus.players.p2.role === "pac" ? versus.pacPower - versus.pacPowerUsed : versus.ghostFlash - versus.ghostFlashUsed;
   scoreValue.textContent = `${versus.p1Score} / ${versus.p2Score}`;
-  pelletProgress.textContent = `${pacPlayer} Pac beans ${totalPellets - pellets.size} / ${totalPellets}`;
-  powerProgress.textContent = `${pacPlayer} Power ${versus.pacPower - versus.pacPowerUsed} · ${ghostPlayer} Flash ${versus.ghostFlash - versus.ghostFlashUsed}`;
+  pelletProgress.textContent = currentLanguage === "zh"
+    ? `${pacPlayer} 豆子 ${totalPellets - pellets.size} / ${totalPellets}`
+    : `${pacPlayer} Pac beans ${totalPellets - pellets.size} / ${totalPellets}`;
+  powerProgress.textContent = currentLanguage === "zh"
+    ? `${pacPlayer} 道具豆 ${versus.pacPower - versus.pacPowerUsed} · ${ghostPlayer} 闪电 ${versus.ghostFlash - versus.ghostFlashUsed}`
+    : `${pacPlayer} Power ${versus.pacPower - versus.pacPowerUsed} · ${ghostPlayer} Flash ${versus.ghostFlash - versus.ghostFlashUsed}`;
   document.querySelectorAll("[data-mobile-ability]").forEach((button) => {
     const player = button.dataset.mobileAbility;
     const inventory = player === "p1" ? p1Inventory : p2Inventory;
@@ -1010,10 +1283,14 @@ function pauseGame(message = "") {
 
 function updateScore() {
   scoreValue.textContent = score;
-  pelletProgress.textContent = currentRole === "ghost"
+  pelletProgress.textContent = currentLanguage === "zh"
+    ? `豆子 ${totalPellets - pellets.size} / ${totalPellets}`
+    : currentRole === "ghost"
     ? `Pac beans ${totalPellets - pellets.size} / ${totalPellets}`
     : `Beans ${totalPellets - pellets.size} / ${totalPellets}`;
-  powerProgress.textContent = `${currentRole === "ghost" ? "Flash" : "Power"} ${powerInventory - powerUsed} / ${powerPellets.size} left`;
+  powerProgress.textContent = currentLanguage === "zh"
+    ? `${currentRole === "ghost" ? "闪电" : "道具"} ${powerInventory - powerUsed} / ${powerPellets.size} 剩余`
+    : `${currentRole === "ghost" ? "Flash" : "Power"} ${powerInventory - powerUsed} / ${powerPellets.size} left`;
   mobilePowerCount.textContent = powerInventory - powerUsed;
   mobileAbilityButton.classList.toggle("ready", powerInventory - powerUsed > 0);
   mobileAbilityButton.classList.toggle("flash-ready", currentRole === "ghost");
@@ -1070,6 +1347,17 @@ function updateTeleportWarning() {
 }
 
 function getControlHint() {
+  if (currentLanguage === "zh") {
+    if (currentRole === "ghost") {
+      return selectedDevice === "mobile"
+        ? "你控制第一只幽灵。中间按钮使用闪电。"
+        : "你控制第一只幽灵。用方向键或 WASD 移动，按 X 使用闪电。";
+    }
+    return selectedDevice === "mobile"
+      ? "使用方向按钮移动。中间按钮使用道具豆。"
+      : "使用方向键或 WASD 移动，按 X 使用道具豆。";
+  }
+
   if (currentRole === "ghost") {
     return selectedDevice === "mobile"
       ? "You are the first ghost. Center button spends Flash."
@@ -1137,7 +1425,9 @@ function movePlayerPacman() {
     powerPellets.delete(key);
     powerInventory += 1;
     score += 25;
-    statusText.textContent = selectedDevice === "mobile" ? "Power bean ready. Tap the center button." : "Power bean ready. Press X near a ghost.";
+    statusText.textContent = currentLanguage === "zh"
+      ? (selectedDevice === "mobile" ? "道具豆已准备。点击中间按钮。" : "道具豆已准备。靠近幽灵时按 X。")
+      : (selectedDevice === "mobile" ? "Power bean ready. Tap the center button." : "Power bean ready. Press X near a ghost.");
     updateScore();
   }
 }
@@ -1162,7 +1452,9 @@ function movePlayerGhost() {
     powerPellets.delete(key);
     powerInventory += 1;
     score += 25;
-    statusText.textContent = selectedDevice === "mobile" ? "Flash ready. Tap the center button." : "Flash ready. Press X to dash.";
+    statusText.textContent = currentLanguage === "zh"
+      ? (selectedDevice === "mobile" ? "闪电已准备。点击中间按钮。" : "闪电已准备。按 X 冲刺。")
+      : (selectedDevice === "mobile" ? "Flash ready. Tap the center button." : "Flash ready. Press X to dash.");
     updateScore();
   }
 }
@@ -1197,7 +1489,7 @@ function moveVersusPacman() {
     powerPellets.delete(key);
     versus.pacPower += 1;
     addVersusScore(versus.pacPlayer, 25);
-    statusText.textContent = `${versus.pacPlayer.toUpperCase()} Power Bean ready.`;
+    statusText.textContent = currentLanguage === "zh" ? `${versus.pacPlayer.toUpperCase()} 道具豆已准备。` : `${versus.pacPlayer.toUpperCase()} Power Bean ready.`;
   }
 
   updateVersusScore();
@@ -1223,7 +1515,7 @@ function moveVersusGhost() {
     versusFlashPellets.delete(key);
     versus.ghostFlash += 1;
     addVersusScore(versus.ghostPlayer, 25);
-    statusText.textContent = `${versus.ghostPlayer.toUpperCase()} Flash ready.`;
+    statusText.textContent = currentLanguage === "zh" ? `${versus.ghostPlayer.toUpperCase()} 闪电已准备。` : `${versus.ghostPlayer.toUpperCase()} Flash ready.`;
   }
 
   updateVersusScore();
@@ -1482,7 +1774,7 @@ function usePowerBean() {
 
   const target = findPowerTarget();
   if (!target) {
-    statusText.textContent = "No ghost is in a clear power line.";
+    statusText.textContent = currentLanguage === "zh" ? "直线范围内没有可命中的幽灵。" : "No ghost is in a clear power line.";
     return;
   }
 
@@ -1502,7 +1794,7 @@ function usePowerBean() {
     to: { x: target.x, y: target.y },
     startedAt: now,
   });
-  statusText.textContent = `${target.color[0].toUpperCase()}${target.color.slice(1)} ghost phased for ${duration / 1000}s.`;
+  statusText.textContent = currentLanguage === "zh" ? `幽灵被虚化 ${duration / 1000} 秒。` : `${target.color[0].toUpperCase()}${target.color.slice(1)} ghost phased for ${duration / 1000}s.`;
   updateScore();
 }
 
@@ -1522,7 +1814,7 @@ function useFlash() {
   }
 
   if (!canMove(playerGhost, dashDirection)) {
-    statusText.textContent = "Flash needs open space ahead.";
+    statusText.textContent = currentLanguage === "zh" ? "闪电需要前方有空位。" : "Flash needs open space ahead.";
     return;
   }
 
@@ -1549,7 +1841,7 @@ function useFlash() {
     startedAt: performance.now(),
   });
   score += Math.max(10, (trail.length - 1) * 8);
-  statusText.textContent = "Flash dash.";
+  statusText.textContent = currentLanguage === "zh" ? "闪电冲刺。" : "Flash dash.";
   updateScore();
 }
 
@@ -1572,7 +1864,7 @@ function useVersusPowerBean(player) {
 
   const target = findPowerTarget();
   if (!target || isGhostPhased(target)) {
-    statusText.textContent = "No ghost is in a clear power line.";
+    statusText.textContent = currentLanguage === "zh" ? "直线范围内没有可命中的幽灵。" : "No ghost is in a clear power line.";
     return;
   }
 
@@ -1589,7 +1881,7 @@ function useVersusPowerBean(player) {
     startedAt: now,
   });
   addVersusScore(player, 35);
-  statusText.textContent = `${player.toUpperCase()} phased the ${target.color} ghost.`;
+  statusText.textContent = currentLanguage === "zh" ? `${player.toUpperCase()} 虚化了幽灵。` : `${player.toUpperCase()} phased the ${target.color} ghost.`;
   updateVersusScore();
 }
 
@@ -1611,7 +1903,7 @@ function useVersusFlash(player) {
   }
 
   if (!canMove(playerGhost, dashDirection)) {
-    statusText.textContent = "Flash needs open space ahead.";
+    statusText.textContent = currentLanguage === "zh" ? "闪电需要前方有空位。" : "Flash needs open space ahead.";
     return;
   }
 
@@ -1638,7 +1930,7 @@ function useVersusFlash(player) {
     startedAt: performance.now(),
   });
   addVersusScore(player, Math.max(10, (trail.length - 1) * 8));
-  statusText.textContent = `${player.toUpperCase()} Flash dash.`;
+  statusText.textContent = currentLanguage === "zh" ? `${player.toUpperCase()} 闪电冲刺。` : `${player.toUpperCase()} Flash dash.`;
   updateVersusScore();
 }
 
@@ -2098,16 +2390,18 @@ function finishGame(won) {
 
 function finishVersusGame(winnerPlayer, reason) {
   pauseGame();
-  resultKicker.textContent = "Local Versus";
-  resultTitle.textContent = `${winnerPlayer.toUpperCase()} wins.`;
-  resultSummary.textContent = `${reason} · P1 ${versus.p1Score} / P2 ${versus.p2Score} · ${currentGhostCount} ${currentGhostCount === 1 ? "Ghost" : "Ghosts"} · No leaderboard save`;
+  resultKicker.textContent = currentLanguage === "zh" ? "本地双人" : "Local Versus";
+  resultTitle.textContent = currentLanguage === "zh" ? `${winnerPlayer.toUpperCase()} 获胜。` : `${winnerPlayer.toUpperCase()} wins.`;
+  resultSummary.textContent = currentLanguage === "zh"
+    ? `本局结束 · P1 ${versus.p1Score} / P2 ${versus.p2Score} · ${currentGhostCount} ${tr("ghosts")} · 不计入排行榜`
+    : `${reason} · P1 ${versus.p1Score} / P2 ${versus.p2Score} · ${currentGhostCount} ${currentGhostCount === 1 ? "Ghost" : "Ghosts"} · No leaderboard save`;
   renderResultStage(winnerPlayer === versus.pacPlayer);
   resultActions.innerHTML = "";
 
   const mainButton = document.createElement("button");
   mainButton.className = "ghost-button";
   mainButton.type = "button";
-  mainButton.textContent = "Back to Main Page";
+  mainButton.textContent = tr("main");
   mainButton.addEventListener("click", () => {
     document.body.classList.remove("versus-mode");
     historyStack.length = 0;
@@ -2119,7 +2413,7 @@ function finishVersusGame(winnerPlayer, reason) {
   const rematchButton = document.createElement("button");
   rematchButton.className = "primary-button";
   rematchButton.type = "button";
-  rematchButton.textContent = "Rematch";
+  rematchButton.textContent = tr("rematch");
   rematchButton.addEventListener("click", () => {
     startVersusCountdown();
   });
@@ -2128,18 +2422,22 @@ function finishVersusGame(winnerPlayer, reason) {
 }
 
 function showResult(won) {
-  resultKicker.textContent = won ? "Victory" : "Game Over";
+  resultKicker.textContent = won ? tr("victory") : tr("gameOver");
   resultTitle.textContent = won
-    ? (currentRole === "ghost" ? "Caught in the tide." : "Beautiful run.")
-    : (currentRole === "ghost" ? "Pac slipped away." : "The tide took this one.");
-  resultSummary.textContent = `${score} points · ${currentRole === "ghost" ? "Ghost Mode" : "Pac Mode"} · ${currentRunType} · ${currentGhostCount} ${currentGhostCount === 1 ? "Ghost" : "Ghosts"}`;
+    ? (currentRole === "ghost" ? tr("caught") : tr("beautifulRun"))
+    : (currentRole === "ghost" ? tr("pacSlipped") : tr("tideTook"));
+  const roleLabel = currentRole === "ghost" ? (currentLanguage === "zh" ? "幽灵模式" : "Ghost Mode") : (currentLanguage === "zh" ? "吃豆人模式" : "Pac Mode");
+  const runLabel = currentRunType === "Story" ? tr("story") : tr("manual");
+  resultSummary.textContent = currentLanguage === "zh"
+    ? `${score} 分 · ${roleLabel} · ${runLabel} · ${currentGhostCount} ${tr("ghosts")}`
+    : `${score} points · ${roleLabel} · ${runLabel} · ${currentGhostCount} ${currentGhostCount === 1 ? "Ghost" : "Ghosts"}`;
   renderResultStage(won);
   resultActions.innerHTML = "";
 
   const mainButton = document.createElement("button");
   mainButton.className = "ghost-button";
   mainButton.type = "button";
-  mainButton.textContent = "Back to Main Page";
+  mainButton.textContent = tr("main");
   mainButton.addEventListener("click", () => {
     historyStack.length = 0;
     historyStack.push("homePage", "invitePage", "gameMenuPage");
@@ -2152,7 +2450,7 @@ function showResult(won) {
   nextButton.type = "button";
 
   if (won) {
-    nextButton.textContent = "Continue to Next Level";
+    nextButton.textContent = tr("continue");
     nextButton.addEventListener("click", () => {
       if (currentRunType === "Story") {
         storyLevel += 1;
@@ -2162,7 +2460,7 @@ function showResult(won) {
       }
     });
   } else {
-    nextButton.textContent = "Restart";
+    nextButton.textContent = tr("restart");
     nextButton.addEventListener("click", () => {
       startCountdown(currentGhostCount, currentRunType, currentRole);
     });
@@ -2612,7 +2910,7 @@ function renderLeaderboard() {
   if (scores.length === 0) {
     const empty = document.createElement("div");
     empty.className = "empty-board";
-    empty.textContent = leaderboardMode === "ghost" ? "No ghost runs yet. Start the first hunt." : "No Pac scores yet. Start the first run.";
+    empty.textContent = leaderboardMode === "ghost" ? tr("noGhostScores") : tr("noPacScores");
     leaderboardList.appendChild(empty);
     return;
   }
@@ -2623,7 +2921,7 @@ function renderLeaderboard() {
     entry.innerHTML = `
       <div class="rank">${String(index + 1).padStart(2, "0")}</div>
       <div>
-        <div class="entry-score">${savedScore.score} pts</div>
+        <div class="entry-score">${savedScore.score} ${currentLanguage === "zh" ? "分" : "pts"}</div>
         <div class="entry-meta">${formatLeaderboardMeta(savedScore)}</div>
       </div>
       <div class="entry-time">${savedScore.time}</div>
@@ -2634,6 +2932,16 @@ function renderLeaderboard() {
 
 function formatLeaderboardMeta(savedScore) {
   const role = savedScore.role || "Pac Mode";
+  if (currentLanguage === "zh") {
+    const roleLabel = role === "Ghost Mode" ? "幽灵模式" : "吃豆人模式";
+    const runLabel = savedScore.runType === "Story" ? "剧情" : "自由";
+    const resultLabel = savedScore.result === "Victory" ? "胜利" : "游戏结束";
+    const baseZh = `${roleLabel} · ${runLabel} · ${savedScore.ghosts} 幽灵 · ${resultLabel} · 地图 ${savedScore.map}`;
+    if (role === "Ghost Mode") {
+      return `${baseZh} · ${formatSeconds(savedScore.duration || 0)} / ${formatSeconds(savedScore.timeLimit || getGhostTimeLimit(savedScore.ghosts))}`;
+    }
+    return savedScore.duration ? `${baseZh} · ${formatSeconds(savedScore.duration)}` : baseZh;
+  }
   const base = `${role} · ${savedScore.runType} · ${savedScore.ghosts} ${savedScore.ghosts === 1 ? "Ghost" : "Ghosts"} · ${savedScore.result} · Map ${savedScore.map}`;
   if (role === "Ghost Mode") {
     return `${base} · ${formatSeconds(savedScore.duration || 0)} / ${formatSeconds(savedScore.timeLimit || getGhostTimeLimit(savedScore.ghosts))}`;
@@ -2986,7 +3294,10 @@ function shuffle(items) {
 }
 
 renderLeaderboard();
+syncDetectedOrientation();
 setDeviceMode(selectedDevice);
+setMobileOrientation(selectedMobileOrientation === "auto" ? "portrait" : selectedMobileOrientation);
 setSkin(selectedSkin);
 setGhostSkin(selectedGhostSkin);
 prepareGame(1, "Story");
+applyLanguage();
