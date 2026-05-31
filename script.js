@@ -3,6 +3,9 @@ const screens = {
   invitePage: document.querySelector("#invitePage"),
   devicePage: document.querySelector("#devicePage"),
   gameMenuPage: document.querySelector("#gameMenuPage"),
+  versusRolePage: document.querySelector("#versusRolePage"),
+  versusSkinPage: document.querySelector("#versusSkinPage"),
+  versusSetupPage: document.querySelector("#versusSetupPage"),
   roleSelectPage: document.querySelector("#roleSelectPage"),
   levelSelectPage: document.querySelector("#levelSelectPage"),
   skinsPage: document.querySelector("#skinsPage"),
@@ -32,6 +35,7 @@ const patchModal = document.querySelector("#patchModal");
 const patchCloseButton = document.querySelector("#patchCloseButton");
 const patchScroll = document.querySelector(".patch-scroll");
 const mobileAbilityButton = document.querySelector("#mobileAbilityButton");
+const mobileAbilityButtons = document.querySelectorAll("[data-mobile-ability]");
 const mobilePowerCount = document.querySelector("#mobilePowerCount");
 const storyStartButton = document.querySelector("#storyStartButton");
 const selectModeButton = document.querySelector("#selectModeButton");
@@ -50,6 +54,16 @@ const deviceButtons = document.querySelectorAll("[data-device]");
 const moveButtons = document.querySelectorAll("[data-move]");
 const skinCards = document.querySelectorAll("[data-skin]");
 const ghostSkinCards = document.querySelectorAll("[data-ghost-skin]");
+const versusRoleButtons = document.querySelectorAll("[data-versus-role]");
+const versusSkinGrids = document.querySelectorAll("[data-versus-skin-grid]");
+const versusGhostButtons = document.querySelectorAll("[data-versus-ghosts]");
+const versusRuleButtons = document.querySelectorAll("[data-versus-rules]");
+const versusStepButtons = document.querySelectorAll("[data-step]");
+const versusStartButton = document.querySelector("#versusStartButton");
+const versusPowerValue = document.querySelector("#versusPowerValue");
+const versusFlashValue = document.querySelector("#versusFlashValue");
+const versusPortalValue = document.querySelector("#versusPortalValue");
+const versusTimeValue = document.querySelector("#versusTimeValue");
 
 const canvasWidth = canvas.width;
 const canvasHeight = canvas.height;
@@ -64,8 +78,11 @@ const ghostColors = ["blue", "red", "yellow"];
 const ghostColorValues = {
   blue: "#4db8ff",
   red: "#f07167",
+  orange: "#ff9f1c",
   yellow: "#ffd166",
   green: "#7bd88f",
+  cyan: "#43e8d8",
+  purple: "#b983ff",
   violet: "#b983ff",
 };
 const skinColorValues = {
@@ -86,6 +103,7 @@ let offsetY = 0;
 let pellets = new Set();
 let powerPellets = new Set();
 let aiPowerPellets = new Set();
+let versusFlashPellets = new Set();
 let wormholes = [];
 let totalPellets = 0;
 let totalPowerPellets = 0;
@@ -114,6 +132,7 @@ let pacRecentPositions = [];
 let currentGhostCount = 1;
 let currentRunType = "Story";
 let currentRole = "pac";
+let versusMode = false;
 let pendingRunType = "Story";
 let storyLevel = 1;
 let threeGhostStreak = 0;
@@ -124,6 +143,28 @@ let selectedDeviceChoice = null;
 let selectedDevice = localStorage.getItem("miniPacDevice") || "desktop";
 let selectedSkin = localStorage.getItem("miniPacSkin") || "yellow";
 let selectedGhostSkin = localStorage.getItem("miniPacGhostSkin") || "blue";
+const versus = {
+  turn: "p1",
+  selected: { p1: null, p2: null },
+  players: {
+    p1: { role: null, skin: "blue", confirmedRole: false, confirmedSkin: false },
+    p2: { role: null, skin: "red", confirmedRole: false, confirmedSkin: false },
+  },
+  ghostCount: 1,
+  rulesMode: "default",
+  settings: { power: 2, flash: 1, portal: 1, time: 3 },
+  pacPlayer: "p1",
+  ghostPlayer: "p2",
+  pacDirection: { x: 0, y: 0 },
+  pacNextDirection: { x: 0, y: 0 },
+  ghostNextDirection: { x: -1, y: 0 },
+  p1Score: 0,
+  p2Score: 0,
+  pacPower: 0,
+  pacPowerUsed: 0,
+  ghostFlash: 0,
+  ghostFlashUsed: 0,
+};
 
 const mapDecks = {
   1: createDeck(1),
@@ -160,6 +201,14 @@ function showScreen(screenId, addToHistory = true) {
   if (screenId === "roleSelectPage") {
     selectedRoleChoice = null;
     roleCards.forEach((button) => button.classList.remove("selected"));
+  }
+
+  if (screenId === "versusRolePage") {
+    resetVersusRoleSelect();
+  }
+
+  if (screenId === "versusSkinPage") {
+    renderVersusSkinChoices();
   }
 
   if (screenId === "gamePage") {
@@ -250,11 +299,18 @@ levelCards.forEach((card) => {
 });
 
 resetButton.addEventListener("click", () => {
+  if (versusMode) {
+    startVersusGame();
+    return;
+  }
+
   startCountdown(currentGhostCount, currentRunType, currentRole);
 });
 
 exitGameButton.addEventListener("click", () => {
   pauseGame("Exited to the arcade menu.");
+  versusMode = false;
+  document.body.classList.remove("versus-mode");
   historyStack.length = 0;
   historyStack.push("homePage", "invitePage", "gameMenuPage");
   showScreen("gameMenuPage", false);
@@ -278,14 +334,23 @@ patchModal.addEventListener("click", (event) => {
   }
 });
 
-mobileAbilityButton.addEventListener("pointerdown", (event) => {
+mobileAbilityButtons.forEach((button) => button.addEventListener("pointerdown", (event) => {
   event.preventDefault();
+  if (versusMode) {
+    useVersusAbility(button.dataset.mobileAbility);
+    return;
+  }
   useAbility();
-});
+}));
 
 moveButtons.forEach((button) => {
   button.addEventListener("pointerdown", (event) => {
     event.preventDefault();
+    if (versusMode) {
+      const player = button.closest("[data-mobile-player]")?.dataset.mobilePlayer || versus.pacPlayer;
+      setVersusDirection(player, directionFromName(button.dataset.move));
+      return;
+    }
     setDirectionFromName(button.dataset.move);
   });
 });
@@ -308,6 +373,50 @@ leaderboardModeButtons.forEach((button) => {
     leaderboardModeButtons.forEach((item) => item.classList.toggle("active", item === button));
     renderLeaderboard();
   });
+});
+
+versusRoleButtons.forEach((button) => {
+  button.addEventListener("click", () => handleVersusRoleClick(button));
+});
+
+versusGhostButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    versus.ghostCount = Number(button.dataset.versusGhosts);
+    versusGhostButtons.forEach((item) => item.classList.toggle("selected", item === button));
+    if (versus.rulesMode === "default") {
+      applyVersusDefaults();
+    }
+    updateVersusSettingsView();
+  });
+});
+
+versusRuleButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    versus.rulesMode = button.dataset.versusRules;
+    versusRuleButtons.forEach((item) => item.classList.toggle("active", item === button));
+    if (versus.rulesMode === "default") {
+      applyVersusDefaults();
+    }
+    updateVersusSettingsView();
+  });
+});
+
+versusStepButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    if (versus.rulesMode !== "custom") {
+      return;
+    }
+    const key = button.dataset.step;
+    const delta = Number(button.dataset.delta);
+    const max = key === "time" ? 5 : 4;
+    const min = key === "time" ? 1 : 0;
+    versus.settings[key] = Math.max(min, Math.min(max, versus.settings[key] + delta));
+    updateVersusSettingsView();
+  });
+});
+
+versusStartButton.addEventListener("click", () => {
+  startVersusCountdown();
 });
 
 function setDeviceMode(device) {
@@ -353,7 +462,173 @@ function getGhostPalette(role, ghostCount) {
   return palette;
 }
 
+function resetVersusRoleSelect() {
+  versusMode = false;
+  document.body.classList.remove("versus-mode");
+  versus.turn = "p1";
+  versus.selected = { p1: null, p2: null };
+  versus.players.p1 = { role: null, skin: "blue", confirmedRole: false, confirmedSkin: false };
+  versus.players.p2 = { role: null, skin: "red", confirmedRole: false, confirmedSkin: false };
+  updateVersusRoleView();
+}
+
+function getVersusGhostPalette() {
+  const playerColor = versus.players[versus.ghostPlayer].skin;
+  const fallback = ["blue", "red", "yellow", "green", "cyan", "purple", "orange"];
+  const palette = [playerColor];
+  fallback.forEach((color) => {
+    if (palette.length < versus.ghostCount && color !== playerColor) {
+      palette.push(color);
+    }
+  });
+  return palette;
+}
+
+function handleVersusRoleClick(button) {
+  const player = button.dataset.versusPlayer;
+  const role = button.dataset.versusRole;
+  if (player !== versus.turn || button.disabled) {
+    return;
+  }
+
+  if (role === "random") {
+    assignVersusRandomRoles(player);
+    showScreen("versusSkinPage");
+    return;
+  }
+
+  if (versus.selected[player] === role && button.classList.contains("selected")) {
+    versus.players[player].role = role;
+    versus.players[player].confirmedRole = true;
+    if (player === "p1") {
+      versus.turn = "p2";
+    } else {
+      finalizeVersusRoles();
+      showScreen("versusSkinPage");
+    }
+    updateVersusRoleView();
+    return;
+  }
+
+  versus.selected[player] = role;
+  updateVersusRoleView();
+}
+
+function assignVersusRandomRoles(player = null) {
+  const other = player === "p1" ? "p2" : player === "p2" ? "p1" : null;
+  if (player && other && versus.players[other].confirmedRole && versus.players[other].role) {
+    versus.players[player].role = versus.players[other].role === "pac" ? "ghost" : "pac";
+    versus.players[player].confirmedRole = true;
+    finalizeVersusRoles();
+    return;
+  }
+
+  if (Math.random() < 0.5) {
+    versus.players.p1.role = "pac";
+    versus.players.p2.role = "ghost";
+  } else {
+    versus.players.p1.role = "ghost";
+    versus.players.p2.role = "pac";
+  }
+  versus.players.p1.confirmedRole = true;
+  versus.players.p2.confirmedRole = true;
+  finalizeVersusRoles();
+}
+
+function finalizeVersusRoles() {
+  versus.pacPlayer = versus.players.p1.role === "pac" ? "p1" : "p2";
+  versus.ghostPlayer = versus.pacPlayer === "p1" ? "p2" : "p1";
+}
+
+function updateVersusRoleView() {
+  document.querySelector("#versusP1RolePanel").classList.toggle("active-turn", versus.turn === "p1");
+  document.querySelector("#versusP2RolePanel").classList.toggle("active-turn", versus.turn === "p2");
+  versusRoleButtons.forEach((button) => {
+    const player = button.dataset.versusPlayer;
+    const role = button.dataset.versusRole;
+    const other = player === "p1" ? "p2" : "p1";
+    const lockedByOther = role !== "random" && versus.players[other].confirmedRole && versus.players[other].role === role;
+    button.disabled = player !== versus.turn || lockedByOther || versus.players[player].confirmedRole;
+    button.classList.toggle("selected", versus.selected[player] === role || versus.players[player].role === role);
+    button.classList.toggle("disabled-choice", lockedByOther);
+  });
+}
+
+function renderVersusSkinChoices() {
+  versusSkinGrids.forEach((grid) => {
+    const player = grid.dataset.versusSkinGrid;
+    const role = versus.players[player].role;
+    const colors = role === "pac" ? Object.keys(skinColorValues) : Object.keys(ghostColorValues);
+    grid.innerHTML = "";
+    grid.closest(".player-panel").classList.toggle("active-turn", !versus.players[player].confirmedSkin);
+    colors.forEach((color) => {
+      const button = document.createElement("button");
+      button.className = `skin-card ${role === "ghost" ? "ghost-skin-card" : ""}`;
+      button.type = "button";
+      button.classList.toggle("selected", versus.players[player].skin === color);
+      button.style.setProperty("--skin-color", role === "pac" ? skinColorValues[color] : ghostColorValues[color]);
+      button.innerHTML = `<span></span><strong>${color[0].toUpperCase()}${color.slice(1)}</strong>`;
+      button.addEventListener("click", () => handleVersusSkinClick(player, color, button));
+      grid.appendChild(button);
+    });
+  });
+}
+
+function handleVersusSkinClick(player, color, button) {
+  if (versus.players[player].confirmedSkin) {
+    return;
+  }
+  if (versus.players[player].skin === color && button.classList.contains("selected")) {
+    versus.players[player].confirmedSkin = true;
+    if (versus.players.p1.confirmedSkin && versus.players.p2.confirmedSkin) {
+      applyVersusDefaults();
+      updateVersusSettingsView();
+      showScreen("versusSetupPage");
+      return;
+    }
+  } else {
+    versus.players[player].skin = color;
+  }
+  renderVersusSkinChoices();
+}
+
+function applyVersusDefaults() {
+  versus.settings.power = versus.ghostCount === 1 ? 2 : versus.ghostCount === 2 ? 3 : 4;
+  versus.settings.flash = versus.ghostCount === 1 ? 1 : versus.ghostCount === 2 ? 2 : 3;
+  versus.settings.portal = versus.ghostCount;
+  versus.settings.time = versus.ghostCount === 1 ? 3 : versus.ghostCount === 2 ? 4 : 5;
+}
+
+function updateVersusSettingsView() {
+  const disabled = versus.rulesMode !== "custom";
+  versusGhostButtons.forEach((button) => {
+    button.classList.toggle("selected", Number(button.dataset.versusGhosts) === versus.ghostCount);
+  });
+  versusRuleButtons.forEach((button) => {
+    button.classList.toggle("active", button.dataset.versusRules === versus.rulesMode);
+  });
+  document.querySelectorAll(".versus-stepper").forEach((row) => row.classList.toggle("disabled-row", disabled));
+  versusPowerValue.textContent = versus.settings.power;
+  versusFlashValue.textContent = versus.settings.flash;
+  versusPortalValue.textContent = versus.settings.portal;
+  versusTimeValue.textContent = versus.settings.time;
+}
+
 function setDirectionFromName(name) {
+  const moveDirection = directionFromName(name);
+  if (!moveDirection) {
+    return;
+  }
+
+  if (versusMode) {
+    setVersusDirection(versus.pacPlayer, moveDirection);
+    return;
+  }
+
+  nextDirection = moveDirection;
+}
+
+function directionFromName(name) {
   const directions = {
     up: { x: 0, y: -1 },
     down: { x: 0, y: 1 },
@@ -361,9 +636,7 @@ function setDirectionFromName(name) {
     right: { x: 1, y: 0 },
   };
 
-  if (directions[name]) {
-    nextDirection = directions[name];
-  }
+  return directions[name] || null;
 }
 
 function startCountdown(ghostCount, runType, role = currentRole) {
@@ -398,6 +671,8 @@ function startCountdown(ghostCount, runType, role = currentRole) {
 }
 
 function prepareGame(ghostCount, runType, role = currentRole) {
+  versusMode = false;
+  document.body.classList.remove("versus-mode");
   currentGhostCount = ghostCount;
   currentRunType = runType;
   currentRole = role;
@@ -420,6 +695,7 @@ function prepareGame(ghostCount, runType, role = currentRole) {
   pellets = new Set();
   powerPellets = new Set();
   aiPowerPellets = new Set();
+  versusFlashPellets = new Set();
   wormholes = [];
   laserEffects = [];
   flashEffects = [];
@@ -485,6 +761,165 @@ function startGameLoop() {
   animationId = requestAnimationFrame(gameLoop);
 }
 
+function startVersusCountdown() {
+  pauseGame();
+  finalizeVersusRoles();
+  currentRole = "versus";
+  currentRunType = "Local Versus";
+  currentGhostCount = versus.ghostCount;
+  countdownMode.textContent = `Local Versus / ${versus.ghostCount} ${versus.ghostCount === 1 ? "Ghost" : "Ghosts"}`;
+  showScreen("countdownPage");
+
+  let number = 3;
+  countdownNumber.textContent = number;
+  countdownNumber.classList.add("versus-countdown");
+  const timer = setInterval(() => {
+    number -= 1;
+    if (number > 0) {
+      countdownNumber.textContent = number;
+      return;
+    }
+
+    clearInterval(timer);
+    countdownNumber.textContent = "Go";
+    setTimeout(() => {
+      countdownNumber.classList.remove("versus-countdown");
+      startVersusGame();
+      if (historyStack[historyStack.length - 1] === "countdownPage") {
+        historyStack.pop();
+      }
+    }, 520);
+  }, 780);
+}
+
+function startVersusGame() {
+  pauseGame();
+  versusMode = true;
+  document.body.classList.add("versus-mode");
+  currentRole = "versus";
+  currentRunType = "Local Versus";
+  currentGhostCount = versus.ghostCount;
+  currentMapIndex = drawMapIndex(versus.ghostCount);
+  currentMap = mapDecks[versus.ghostCount][currentMapIndex];
+  tileSize = Math.min((canvasWidth - mapPadding * 2) / currentMap.cols, (canvasHeight - mapPadding * 2) / currentMap.rows);
+  offsetX = (canvasWidth - currentMap.cols * tileSize) / 2;
+  offsetY = (canvasHeight - currentMap.rows * tileSize) / 2;
+  pellets = new Set();
+  powerPellets = new Set();
+  aiPowerPellets = new Set();
+  versusFlashPellets = new Set();
+  wormholes = [];
+  flashEffects = [];
+  laserEffects = [];
+  teleportEffects = [];
+  powerInventory = 0;
+  powerUsed = 0;
+  versus.p1Score = 0;
+  versus.p2Score = 0;
+  versus.pacPower = 0;
+  versus.pacPowerUsed = 0;
+  versus.ghostFlash = 0;
+  versus.ghostFlashUsed = 0;
+  score = 0;
+  elapsedTime = 0;
+  ghostTimeLimit = versus.settings.time * 60000;
+  pacman = { ...currentMap.playerStart, mouth: 0 };
+  direction = { x: 0, y: 0 };
+  nextDirection = { x: 0, y: 0 };
+  versus.pacDirection = { x: 0, y: 0 };
+  versus.pacNextDirection = { x: 0, y: 0 };
+  versus.ghostNextDirection = { x: -1, y: 0 };
+  pacRecentPositions = [`${pacman.x},${pacman.y}`];
+  const versusGhostPalette = getVersusGhostPalette();
+  ghosts = currentMap.ghostStarts.slice(0, versus.ghostCount).map((start, index) => ({
+    ...start,
+    index,
+    color: versusGhostPalette[index],
+    direction: { x: index % 2 === 0 ? -1 : 1, y: 0 },
+    memory: [],
+    timer: 0,
+    phasedUntil: 0,
+    pressureDumbUntil: 0,
+    flashUntil: 0,
+    flashEffectUntil: 0,
+    teleporting: null,
+    wobble: 0,
+  }));
+  currentMap.rowsData.forEach((row, y) => {
+    row.split("").forEach((tile, x) => {
+      if (tile === "." && shouldPlacePellet(x, y)) {
+        pellets.add(`${x},${y}`);
+      }
+    });
+  });
+  placeExactItems(powerPellets, versus.settings.power, "power");
+  placeExactItems(aiPowerPellets, 0, "ai");
+  placeExactItemsForFlash(versus.settings.flash);
+  placeExactPortals(versus.settings.portal);
+  totalPellets = pellets.size;
+  gameModeLabel.textContent = `Local Versus / Map ${currentMapIndex + 1}`;
+  ghostCountValue.textContent = versus.ghostCount;
+  statusText.textContent = "P1: WASD + Q. P2: Arrows + / or ?";
+  updateVersusScore();
+  updateTimerDisplay();
+  showScreen("gamePage");
+  startGameLoop();
+}
+
+function placeExactItems(targetSet, amount) {
+  const candidates = [];
+  currentMap.rowsData.forEach((row, y) => {
+    row.split("").forEach((tile, x) => {
+      const key = `${x},${y}`;
+      if (tile === "." && !powerPellets.has(key) && !aiPowerPellets.has(key) && !versusFlashPellets.has(key) && !targetSet.has(key)) {
+        candidates.push({ x, y });
+      }
+    });
+  });
+  shuffle(candidates).slice(0, amount).forEach((cell) => targetSet.add(`${cell.x},${cell.y}`));
+}
+
+function placeExactItemsForFlash(amount) {
+  placeExactItems(versusFlashPellets, amount);
+}
+
+function placeExactPortals(amount) {
+  const oldCount = currentGhostCount;
+  currentGhostCount = amount <= 1 ? 1 : amount === 2 ? 2 : 3;
+  const candidates = [];
+  currentMap.rowsData.forEach((row, y) => {
+    row.split("").forEach((tile, x) => {
+      const key = `${x},${y}`;
+      if (tile === "." && !powerPellets.has(key) && !aiPowerPellets.has(key) && !versusFlashPellets.has(key)) {
+        candidates.push({ x, y });
+      }
+    });
+  });
+  shuffle(candidates).forEach((cell) => {
+    const farEnough = wormholes.every((hole) => Math.abs(hole.x - cell.x) + Math.abs(hole.y - cell.y) >= 6);
+    if (farEnough && wormholes.length < amount) wormholes.push(cell);
+  });
+  currentGhostCount = oldCount;
+}
+
+function updateVersusScore() {
+  const pacPlayer = versus.pacPlayer.toUpperCase();
+  const ghostPlayer = versus.ghostPlayer.toUpperCase();
+  const p1Inventory = versus.players.p1.role === "pac" ? versus.pacPower - versus.pacPowerUsed : versus.ghostFlash - versus.ghostFlashUsed;
+  const p2Inventory = versus.players.p2.role === "pac" ? versus.pacPower - versus.pacPowerUsed : versus.ghostFlash - versus.ghostFlashUsed;
+  scoreValue.textContent = `${versus.p1Score} / ${versus.p2Score}`;
+  pelletProgress.textContent = `${pacPlayer} Pac beans ${totalPellets - pellets.size} / ${totalPellets}`;
+  powerProgress.textContent = `${pacPlayer} Power ${versus.pacPower - versus.pacPowerUsed} · ${ghostPlayer} Flash ${versus.ghostFlash - versus.ghostFlashUsed}`;
+  document.querySelectorAll("[data-mobile-ability]").forEach((button) => {
+    const player = button.dataset.mobileAbility;
+    const inventory = player === "p1" ? p1Inventory : p2Inventory;
+    button.querySelector("em").textContent = Math.max(0, inventory);
+    button.classList.toggle("ready", inventory > 0);
+    button.classList.toggle("flash-ready", versus.players[player].role === "ghost");
+  });
+  renderGhostEffects();
+}
+
 function pauseGame(message = "") {
   gameRunning = false;
   cancelAnimationFrame(animationId);
@@ -517,6 +952,14 @@ function formatTime(milliseconds) {
 }
 
 function updateTimerDisplay() {
+  if (versusMode) {
+    gameTimer.textContent = formatTime(ghostTimeLimit - elapsedTime);
+    gameTimer.classList.toggle("urgent", ghostTimeLimit - elapsedTime <= 30000);
+    gameTimer.setAttribute("aria-label", "Local Versus countdown timer");
+    updateTeleportWarning();
+    return;
+  }
+
   if (currentRole === "ghost") {
     gameTimer.textContent = formatTime(ghostTimeLimit - elapsedTime);
     gameTimer.classList.toggle("urgent", ghostTimeLimit - elapsedTime <= 30000);
@@ -535,7 +978,7 @@ function updateTeleportWarning() {
     return;
   }
 
-  if (currentRole !== "ghost" || wormholes.length === 0 || ghostStationaryMs < 3000) {
+  if ((!versusMode && currentRole !== "ghost") || wormholes.length === 0 || ghostStationaryMs < 3000) {
     teleportWarning.textContent = "";
     teleportWarning.className = "teleport-warning";
     return;
@@ -644,6 +1087,77 @@ function movePlayerGhost() {
   }
 }
 
+function setVersusDirection(player, moveDirection) {
+  if (versus.players[player].role === "pac") {
+    versus.pacNextDirection = moveDirection;
+  } else {
+    versus.ghostNextDirection = moveDirection;
+  }
+}
+
+function moveVersusPacman() {
+  if (canMove(pacman, versus.pacNextDirection)) {
+    versus.pacDirection = versus.pacNextDirection;
+    direction = versus.pacDirection;
+  }
+
+  if (canMove(pacman, versus.pacDirection)) {
+    pacman.x += versus.pacDirection.x;
+    pacman.y += versus.pacDirection.y;
+  }
+
+  pacman.mouth += 0.28;
+  const key = `${pacman.x},${pacman.y}`;
+  if (pellets.has(key)) {
+    pellets.delete(key);
+    addVersusScore(versus.pacPlayer, 10);
+  }
+
+  if (powerPellets.has(key)) {
+    powerPellets.delete(key);
+    versus.pacPower += 1;
+    addVersusScore(versus.pacPlayer, 25);
+    statusText.textContent = `${versus.pacPlayer.toUpperCase()} Power Bean ready.`;
+  }
+
+  updateVersusScore();
+}
+
+function moveVersusGhost() {
+  const playerGhost = ghosts[0];
+  if (!playerGhost || playerGhost.teleporting) {
+    return;
+  }
+
+  if (canMove(playerGhost, versus.ghostNextDirection)) {
+    playerGhost.direction = versus.ghostNextDirection;
+  }
+
+  if (canMove(playerGhost, playerGhost.direction)) {
+    playerGhost.x += playerGhost.direction.x;
+    playerGhost.y += playerGhost.direction.y;
+  }
+
+  const key = `${playerGhost.x},${playerGhost.y}`;
+  if (versusFlashPellets.has(key)) {
+    versusFlashPellets.delete(key);
+    versus.ghostFlash += 1;
+    addVersusScore(versus.ghostPlayer, 25);
+    statusText.textContent = `${versus.ghostPlayer.toUpperCase()} Flash ready.`;
+  }
+
+  updateVersusScore();
+}
+
+function addVersusScore(player, amount) {
+  if (player === "p1") {
+    versus.p1Score += amount;
+  } else {
+    versus.p2Score += amount;
+  }
+  score = Math.max(versus.p1Score, versus.p2Score);
+}
+
 function placePowerItems() {
   const target = currentGhostCount === 1
     ? (Math.random() < 0.5 ? 1 : 0)
@@ -733,7 +1247,13 @@ function placeAiPowerBeans() {
     });
   });
 
-  shuffle(candidates).slice(0, 1).forEach((cell) => {
+  const target = currentGhostCount === 1
+    ? 2
+    : currentGhostCount === 2
+    ? (Math.random() < 0.18 ? 4 : 3)
+    : (Math.random() < 0.18 ? 5 : 4);
+
+  shuffle(candidates).slice(0, target).forEach((cell) => {
     aiPowerPellets.add(`${cell.x},${cell.y}`);
   });
 }
@@ -748,7 +1268,7 @@ function getOpenDirections(position) {
 }
 
 function moveGhost(ghost) {
-  if (currentRole === "ghost" && ghost.index === 0) {
+  if ((currentRole === "ghost" || versusMode) && ghost.index === 0) {
     return;
   }
 
@@ -953,6 +1473,95 @@ function useFlash() {
   updateScore();
 }
 
+function useVersusAbility(player) {
+  if (!gameRunning || !versusMode) {
+    return;
+  }
+
+  if (versus.players[player].role === "pac") {
+    useVersusPowerBean(player);
+  } else {
+    useVersusFlash(player);
+  }
+}
+
+function useVersusPowerBean(player) {
+  if (versus.pacPower - versus.pacPowerUsed <= 0) {
+    return;
+  }
+
+  const target = findPowerTarget();
+  if (!target || isGhostPhased(target)) {
+    statusText.textContent = "No ghost is in a clear power line.";
+    return;
+  }
+
+  const now = performance.now();
+  const duration = getPhasedDuration();
+  versus.pacPowerUsed += 1;
+  target.phaseDuration = duration;
+  target.phasedUntil = now + duration;
+  target.timer = 0;
+  target.wobble = 0;
+  laserEffects.push({
+    from: { x: pacman.x, y: pacman.y },
+    to: { x: target.x, y: target.y },
+    startedAt: now,
+  });
+  addVersusScore(player, 35);
+  statusText.textContent = `${player.toUpperCase()} phased the ${target.color} ghost.`;
+  updateVersusScore();
+}
+
+function useVersusFlash(player) {
+  if (versus.ghostFlash - versus.ghostFlashUsed <= 0) {
+    return;
+  }
+
+  const playerGhost = ghosts[0];
+  if (!playerGhost || playerGhost.teleporting) {
+    return;
+  }
+
+  let dashDirection = playerGhost.direction;
+  if (dashDirection.x === 0 && dashDirection.y === 0) {
+    dashDirection = versus.ghostNextDirection.x !== 0 || versus.ghostNextDirection.y !== 0
+      ? versus.ghostNextDirection
+      : { x: -1, y: 0 };
+  }
+
+  if (!canMove(playerGhost, dashDirection)) {
+    statusText.textContent = "Flash needs open space ahead.";
+    return;
+  }
+
+  versus.ghostFlashUsed += 1;
+  const trail = [{ x: playerGhost.x, y: playerGhost.y }];
+  for (let step = 0; step < 4; step += 1) {
+    if (!canMove(playerGhost, dashDirection)) {
+      break;
+    }
+    playerGhost.x += dashDirection.x;
+    playerGhost.y += dashDirection.y;
+    trail.push({ x: playerGhost.x, y: playerGhost.y });
+    if (playerGhost.x === pacman.x && playerGhost.y === pacman.y) {
+      break;
+    }
+  }
+
+  playerGhost.direction = dashDirection;
+  playerGhost.flashUntil = performance.now() + 520;
+  playerGhost.flashEffectUntil = performance.now() + 2500;
+  flashEffects.push({
+    color: playerGhost.color,
+    trail,
+    startedAt: performance.now(),
+  });
+  addVersusScore(player, Math.max(10, (trail.length - 1) * 8));
+  statusText.textContent = `${player.toUpperCase()} Flash dash.`;
+  updateVersusScore();
+}
+
 function findPowerTarget() {
   const candidates = ghosts
     .filter((ghost) => !isGhostPhased(ghost))
@@ -1016,7 +1625,7 @@ function checkCollision() {
 }
 
 function updateGhostStationary(delta) {
-  if (currentRole !== "ghost" || wormholes.length === 0 || !ghosts[0] || ghosts[0].teleporting) {
+  if ((!versusMode && currentRole !== "ghost") || wormholes.length === 0 || !ghosts[0] || ghosts[0].teleporting) {
     return;
   }
 
@@ -1282,6 +1891,11 @@ function gameLoop(timestamp) {
     return;
   }
 
+  if (versusMode) {
+    gameLoopVersus(timestamp);
+    return;
+  }
+
   const delta = timestamp - lastFrameTime;
   lastFrameTime = timestamp;
   elapsedTime = timestamp - gameStartTime;
@@ -1342,10 +1956,95 @@ function gameLoop(timestamp) {
   animationId = requestAnimationFrame(gameLoop);
 }
 
+function gameLoopVersus(timestamp) {
+  const delta = timestamp - lastFrameTime;
+  lastFrameTime = timestamp;
+  elapsedTime = timestamp - gameStartTime;
+  updateTimerDisplay();
+  updateTeleportingGhosts(timestamp);
+
+  pacmanTimer += delta;
+  if (pacmanTimer >= pacmanDelay) {
+    pacmanTimer = 0;
+    moveVersusPacman();
+  }
+
+  ghosts.forEach((ghost) => {
+    ghost.timer += delta;
+    const delay = getGhostMoveDelay(ghost);
+    if (ghost.timer >= delay) {
+      ghost.timer = 0;
+      moveGhost(ghost);
+    }
+  });
+
+  ghostTimer += delta;
+  if (ghostTimer >= getGhostMoveDelay(ghosts[0])) {
+    ghostTimer = 0;
+    moveVersusGhost();
+  }
+  updateGhostStationary(delta);
+  softenHeavyPressure();
+
+  laserEffects = laserEffects.filter((effect) => timestamp - effect.startedAt < 420);
+  flashEffects = flashEffects.filter((effect) => timestamp - effect.startedAt < 520);
+  teleportEffects = teleportEffects.filter((effect) => timestamp - effect.startedAt < effect.duration + 260);
+  renderGhostEffects();
+
+  if (checkCollision()) {
+    finishVersusGame(versus.ghostPlayer, "Caught Pac before the tide ran out.");
+    return;
+  }
+
+  if (pellets.size === 0) {
+    finishVersusGame(versus.pacPlayer, "Cleared the maze.");
+    return;
+  }
+
+  if (elapsedTime >= ghostTimeLimit) {
+    finishVersusGame(versus.ghostPlayer, "Pac ran out of time.");
+    return;
+  }
+
+  drawGame();
+  animationId = requestAnimationFrame(gameLoop);
+}
+
 function finishGame(won) {
   pauseGame();
   saveLeaderboardScore(score, won);
   showResult(won);
+}
+
+function finishVersusGame(winnerPlayer, reason) {
+  pauseGame();
+  resultKicker.textContent = "Local Versus";
+  resultTitle.textContent = `${winnerPlayer.toUpperCase()} wins.`;
+  resultSummary.textContent = `${reason} · P1 ${versus.p1Score} / P2 ${versus.p2Score} · ${currentGhostCount} ${currentGhostCount === 1 ? "Ghost" : "Ghosts"} · No leaderboard save`;
+  renderResultStage(winnerPlayer === versus.pacPlayer);
+  resultActions.innerHTML = "";
+
+  const mainButton = document.createElement("button");
+  mainButton.className = "ghost-button";
+  mainButton.type = "button";
+  mainButton.textContent = "Back to Main Page";
+  mainButton.addEventListener("click", () => {
+    document.body.classList.remove("versus-mode");
+    historyStack.length = 0;
+    historyStack.push("homePage", "invitePage", "gameMenuPage");
+    showScreen("gameMenuPage", false);
+  });
+  resultActions.appendChild(mainButton);
+
+  const rematchButton = document.createElement("button");
+  rematchButton.className = "primary-button";
+  rematchButton.type = "button";
+  rematchButton.textContent = "Rematch";
+  rematchButton.addEventListener("click", () => {
+    startVersusCountdown();
+  });
+  resultActions.appendChild(rematchButton);
+  showScreen("resultPage");
 }
 
 function showResult(won) {
@@ -1398,8 +2097,9 @@ function renderResultStage(won) {
   const pac = document.createElement("span");
   pac.className = "runner result-pac";
   pac.style.left = won ? "18%" : "30%";
-  pac.style.background = `conic-gradient(from 36deg, transparent 0deg 74deg, ${skinColorValues[selectedSkin]} 75deg 360deg)`;
-  pac.style.boxShadow = `0 0 26px ${skinColorValues[selectedSkin]}`;
+  const pacColor = versusMode ? versus.players[versus.pacPlayer].skin : selectedSkin;
+  pac.style.background = `conic-gradient(from 36deg, transparent 0deg 74deg, ${skinColorValues[pacColor] || skinColorValues.yellow} 75deg 360deg)`;
+  pac.style.boxShadow = `0 0 26px ${skinColorValues[pacColor] || skinColorValues.yellow}`;
   resultStage.appendChild(pac);
 
   ghosts.forEach((ghost, index) => {
@@ -1423,6 +2123,7 @@ function drawGame() {
   drawTeleportEffects();
   drawPellets();
   drawAiPowerPellets();
+  drawVersusFlashPellets();
   drawPowerPellets();
   drawLaserEffects();
   drawFlashEffects();
@@ -1564,6 +2265,30 @@ function drawAiPowerPellets() {
   context.shadowBlur = 0;
 }
 
+function drawVersusFlashPellets() {
+  if (!versusMode) {
+    return;
+  }
+
+  const pulse = 0.75 + Math.sin(performance.now() / 210) * 0.25;
+  versusFlashPellets.forEach((key) => {
+    const [x, y] = key.split(",").map(Number);
+    context.save();
+    context.translate(cellCenterX(x), cellCenterY(y));
+    context.fillStyle = flashColor;
+    context.shadowColor = "rgba(246, 211, 101, 0.92)";
+    context.shadowBlur = 18;
+    drawFlashBolt(0, 0, Math.max(10, tileSize * 0.42) * pulse);
+    context.beginPath();
+    context.strokeStyle = "rgba(246, 211, 101, 0.58)";
+    context.lineWidth = Math.max(1, tileSize * 0.03);
+    context.arc(0, 0, Math.max(5, tileSize * 0.25), 0, Math.PI * 2);
+    context.stroke();
+    context.restore();
+  });
+  context.shadowBlur = 0;
+}
+
 function drawFlashBolt(x, y, size) {
   context.beginPath();
   context.moveTo(x + size * 0.08, y - size * 0.5);
@@ -1661,6 +2386,7 @@ function drawPacman() {
   const radius = tileSize * 0.38;
   const mouth = 0.22 + Math.abs(Math.sin(pacman.mouth)) * 0.18;
   const angle = Math.atan2(direction.y, direction.x || 1);
+  const pacColor = versusMode ? versus.players[versus.pacPlayer].skin : selectedSkin;
 
   context.save();
   context.translate(cellCenterX(pacman.x), cellCenterY(pacman.y));
@@ -1669,8 +2395,8 @@ function drawPacman() {
   context.moveTo(0, 0);
   context.arc(0, 0, radius, mouth, Math.PI * 2 - mouth);
   context.closePath();
-  context.fillStyle = skinColorValues[selectedSkin];
-  context.shadowColor = skinColorValues[selectedSkin];
+  context.fillStyle = skinColorValues[pacColor] || skinColorValues.yellow;
+  context.shadowColor = skinColorValues[pacColor] || skinColorValues.yellow;
   context.shadowBlur = 18;
   context.fill();
   context.shadowBlur = 0;
@@ -1842,7 +2568,7 @@ function formatSeconds(milliseconds) {
 function renderGhostEffects() {
   ghostEffects.innerHTML = "";
   const now = performance.now();
-  if (currentRole === "ghost") {
+  if (currentRole === "ghost" || versusMode) {
     ghosts
       .filter((ghost) => ghost.flashEffectUntil > now)
       .forEach((ghost) => {
@@ -1876,6 +2602,49 @@ function renderGhostEffects() {
 }
 
 document.addEventListener("keydown", (event) => {
+  if (versusMode) {
+    const p1Map = {
+      w: { x: 0, y: -1 },
+      W: { x: 0, y: -1 },
+      s: { x: 0, y: 1 },
+      S: { x: 0, y: 1 },
+      a: { x: -1, y: 0 },
+      A: { x: -1, y: 0 },
+      d: { x: 1, y: 0 },
+      D: { x: 1, y: 0 },
+    };
+    const p2Map = {
+      ArrowUp: { x: 0, y: -1 },
+      ArrowDown: { x: 0, y: 1 },
+      ArrowLeft: { x: -1, y: 0 },
+      ArrowRight: { x: 1, y: 0 },
+    };
+
+    if (p1Map[event.key]) {
+      event.preventDefault();
+      setVersusDirection("p1", p1Map[event.key]);
+      return;
+    }
+
+    if (p2Map[event.key]) {
+      event.preventDefault();
+      setVersusDirection("p2", p2Map[event.key]);
+      return;
+    }
+
+    if (event.key === "q" || event.key === "Q") {
+      event.preventDefault();
+      useVersusAbility("p1");
+      return;
+    }
+
+    if (event.key === "/" || event.key === "?") {
+      event.preventDefault();
+      useVersusAbility("p2");
+      return;
+    }
+  }
+
   const keyMap = {
     ArrowUp: { x: 0, y: -1 },
     w: { x: 0, y: -1 },

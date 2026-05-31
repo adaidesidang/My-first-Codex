@@ -72,12 +72,113 @@
           <h2 class="splash-title">Mini Pac<span class="version-splash menu-splash">v2.0 flash bean</span></h2>
           <nav class="vertical-menu" aria-label="Game menu">
             <button type="button" id="storyStartButton">Start Game</button>
+            <button type="button" data-go="versusRolePage">Local Versus</button>
             <button type="button" data-go="leaderboardPage">Leaderboard</button>
             <button type="button" id="selectModeButton">Select Level</button>
             <button type="button" data-go="skinsPage">Skins</button>
             <button type="button" data-go="creditsPage">Credits</button>
           </nav>
           <button class="ghost-button lower-back" type="button" data-back>Back</button>
+        </div>
+      </section>
+
+      <section id="versusRolePage" class="screen">
+        <div class="select-panel versus-panel">
+          <p class="eyebrow">Local versus</p>
+          <h2>Choose Fighters</h2>
+          <p class="panel-text">Player 1 chooses first. Click once to frame, click again to lock.</p>
+          <div class="versus-duo">
+            <article class="player-panel p1-panel active-turn" id="versusP1RolePanel">
+              <p class="player-tag">Player 1</p>
+              <div class="versus-role-grid">
+                <button class="versus-choice" type="button" data-versus-player="p1" data-versus-role="pac">
+                  <span class="mini-pac"></span>
+                  <strong>Pac</strong>
+                </button>
+                <button class="versus-choice" type="button" data-versus-player="p1" data-versus-role="ghost">
+                  <span class="mini-ghost blue"></span>
+                  <strong>Ghost</strong>
+                </button>
+                <button class="versus-choice random-choice" type="button" data-versus-player="p1" data-versus-role="random">
+                  <span>∞</span>
+                  <strong>Random</strong>
+                </button>
+              </div>
+            </article>
+            <article class="player-panel p2-panel" id="versusP2RolePanel">
+              <p class="player-tag">Player 2</p>
+              <div class="versus-role-grid">
+                <button class="versus-choice" type="button" data-versus-player="p2" data-versus-role="pac">
+                  <span class="mini-pac"></span>
+                  <strong>Pac</strong>
+                </button>
+                <button class="versus-choice" type="button" data-versus-player="p2" data-versus-role="ghost">
+                  <span class="mini-ghost red"></span>
+                  <strong>Ghost</strong>
+                </button>
+                <button class="versus-choice random-choice" type="button" data-versus-player="p2" data-versus-role="random">
+                  <span>∞</span>
+                  <strong>Random</strong>
+                </button>
+              </div>
+            </article>
+          </div>
+          <div class="actions split-actions">
+            <button class="ghost-button" type="button" data-back>Back</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="versusSkinPage" class="screen">
+        <div class="select-panel versus-panel">
+          <p class="eyebrow">Local versus</p>
+          <h2>Choose Skins</h2>
+          <p class="panel-text">Both players lock a skin before setup.</p>
+          <div class="versus-duo">
+            <article class="player-panel p1-panel active-turn" id="versusP1SkinPanel">
+              <p class="player-tag">Player 1</p>
+              <div class="versus-skin-grid" data-versus-skin-grid="p1"></div>
+            </article>
+            <article class="player-panel p2-panel" id="versusP2SkinPanel">
+              <p class="player-tag">Player 2</p>
+              <div class="versus-skin-grid" data-versus-skin-grid="p2"></div>
+            </article>
+          </div>
+          <div class="actions split-actions">
+            <button class="ghost-button" type="button" data-back>Back</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="versusSetupPage" class="screen">
+        <div class="select-panel versus-setup-panel">
+          <p class="eyebrow">Local versus</p>
+          <h2>Map Setup</h2>
+          <div class="versus-setup-layout">
+            <div class="versus-map-preview">
+              <div class="level-cards compact-levels">
+                <button class="level-card selected" type="button" data-versus-ghosts="1"><strong>Un Ghost</strong></button>
+                <button class="level-card" type="button" data-versus-ghosts="2"><strong>Duo Ghosts</strong></button>
+                <button class="level-card" type="button" data-versus-ghosts="3"><strong>Trios Ghosts</strong></button>
+              </div>
+            </div>
+            <aside class="versus-options">
+              <div class="leaderboard-toggle versus-toggle" aria-label="Versus rules mode">
+                <button class="active" type="button" data-versus-rules="default">Default</button>
+                <button type="button" data-versus-rules="custom">Customize</button>
+              </div>
+              <div class="versus-stepper-list">
+                <div class="versus-stepper" data-setting-row="power"><span class="power-dot"></span><b>Power Bean</b><button type="button" data-step="power" data-delta="1">+</button><em id="versusPowerValue">2</em><button type="button" data-step="power" data-delta="-1">-</button></div>
+                <div class="versus-stepper" data-setting-row="flash"><span class="flash-symbol small"></span><b>Flash</b><button type="button" data-step="flash" data-delta="1">+</button><em id="versusFlashValue">1</em><button type="button" data-step="flash" data-delta="-1">-</button></div>
+                <div class="versus-stepper" data-setting-row="portal"><span class="portal-icon"></span><b>Portal</b><button type="button" data-step="portal" data-delta="1">+</button><em id="versusPortalValue">1</em><button type="button" data-step="portal" data-delta="-1">-</button></div>
+                <div class="versus-stepper" data-setting-row="time"><span class="timer-dot"></span><b>Time</b><button type="button" data-step="time" data-delta="1">+</button><em id="versusTimeValue">3</em><button type="button" data-step="time" data-delta="-1">-</button></div>
+              </div>
+              <button class="primary-button" id="versusStartButton" type="button">Start Versus</button>
+            </aside>
+          </div>
+          <div class="actions split-actions">
+            <button class="ghost-button" type="button" data-back>Back</button>
+          </div>
         </div>
       </section>
 
@@ -247,12 +348,22 @@
           </header>
           <div class="game-play-space">
             <canvas id="gameCanvas" width="800" height="600" aria-label="Pac-Man style game"></canvas>
-            <div id="mobileControls" class="mobile-controls" aria-label="Mobile game controls">
+            <div id="mobileControls" class="mobile-controls" data-mobile-player="p1" aria-label="Player 1 mobile controls">
               <button class="dpad-button dpad-up" type="button" data-move="up" aria-label="Move up">↑</button>
               <button class="dpad-button dpad-left" type="button" data-move="left" aria-label="Move left">←</button>
-              <button class="dpad-button dpad-center ability-button" id="mobileAbilityButton" type="button" aria-label="Use power bean">
+              <button class="dpad-button dpad-center ability-button" id="mobileAbilityButton" data-mobile-ability="p1" type="button" aria-label="Use power bean">
                 <span class="power-bean-icon"></span>
                 <em id="mobilePowerCount">0</em>
+              </button>
+              <button class="dpad-button dpad-right" type="button" data-move="right" aria-label="Move right">→</button>
+              <button class="dpad-button dpad-down" type="button" data-move="down" aria-label="Move down">↓</button>
+            </div>
+            <div id="mobileControlsP2" class="mobile-controls versus-mobile-controls" data-mobile-player="p2" aria-label="Player 2 mobile controls">
+              <button class="dpad-button dpad-up" type="button" data-move="up" aria-label="Move up">↑</button>
+              <button class="dpad-button dpad-left" type="button" data-move="left" aria-label="Move left">←</button>
+              <button class="dpad-button dpad-center ability-button" data-mobile-ability="p2" type="button" aria-label="Use ability">
+                <span class="power-bean-icon"></span>
+                <em>0</em>
               </button>
               <button class="dpad-button dpad-right" type="button" data-move="right" aria-label="Move right">→</button>
               <button class="dpad-button dpad-down" type="button" data-move="down" aria-label="Move down">↓</button>
@@ -317,6 +428,25 @@
       <h2 id="patchTitle">Version Log</h2>
       <div class="patch-scroll">
         <article class="patch-entry featured-entry">
+          <header>
+            <h3>Version 3.0</h3>
+            <time>May 31, 2026</time>
+          </header>
+          <p>
+            Added Local Versus, a same-device two-player mode with role select, skin select, and customizable map rules.
+          </p>
+          <div class="patch-demo versus-demo" aria-label="Local versus animation">
+            <span class="demo-p1">P1</span>
+            <span class="demo-p2">P2</span>
+            <span class="demo-pac"></span>
+            <span class="demo-ghost dash"></span>
+          </div>
+          <p>
+            Player 1 uses WASD and Q. Player 2 uses arrow keys and / or ?. Versus scores are kept out of leaderboard.
+          </p>
+        </article>
+
+        <article class="patch-entry">
           <header>
             <h3>Version 2.3</h3>
             <time>May 31, 2026</time>
