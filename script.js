@@ -679,7 +679,7 @@ function placePowerItems() {
 
 function placeWormholes() {
   const target = currentGhostCount === 1
-    ? (Math.random() < 0.4 ? 1 : 0)
+    ? 1
     : currentGhostCount === 2
     ? (Math.random() < 0.16 ? 3 : 2)
     : (Math.random() < 0.16 ? 4 : 3);
@@ -1098,14 +1098,14 @@ function moveAiPacman() {
       const nearestPellet = findNearestPelletDistance(x, y);
       const nearestPower = findNearestAiPowerDistance(x, y);
       const openSpace = getOpenDirections({ x, y }).length;
-      const intelligence = currentGhostCount === 1 ? 1 : currentGhostCount === 2 ? 1.42 : 1.78;
+      const intelligence = currentGhostCount === 1 ? 1.16 : currentGhostCount === 2 ? 1.58 : 1.96;
       const dangerPenalty = nearestGhost <= 1 ? 46 * intelligence : nearestGhost <= 2 ? 26 * intelligence : nearestGhost <= 4 ? 8 * intelligence : 0;
-      const greedyPull = nearestPellet * (currentGhostCount === 1 ? 2.25 : currentGhostCount === 2 ? 2.65 : 3.05);
-      const powerPull = nearestGhost <= 5 && aiPowerPellets.size > 0 ? nearestPower * (currentGhostCount === 1 ? 1.55 : currentGhostCount === 2 ? 2.08 : 2.48) : 0;
-      const reversePenalty = option.x === -direction.x && option.y === -direction.y ? (currentGhostCount === 1 ? 2.5 : currentGhostCount === 2 ? 8 : 12) : 0;
-      const oscillationPenalty = wouldRepeatPacStep(x, y) ? (currentGhostCount === 1 ? 1.5 : currentGhostCount === 2 ? 9 : 14) : 0;
-      const greedyNoise = Math.random() < (currentGhostCount === 1 ? 0.18 : currentGhostCount === 2 ? 0.08 : 0.04) ? 5 : 0;
-      const escapeBonus = blockedEscape ? evaluateEscapeRoute(x, y) * (currentGhostCount === 1 ? 9 : currentGhostCount === 2 ? 13 : 16) : 0;
+      const greedyPull = nearestPellet * (currentGhostCount === 1 ? 2.4 : currentGhostCount === 2 ? 2.85 : 3.28);
+      const powerPull = nearestGhost <= 5 && aiPowerPellets.size > 0 ? nearestPower * (currentGhostCount === 1 ? 1.78 : currentGhostCount === 2 ? 2.32 : 2.76) : 0;
+      const reversePenalty = option.x === -direction.x && option.y === -direction.y ? (currentGhostCount === 1 ? 4.5 : currentGhostCount === 2 ? 10 : 15) : 0;
+      const oscillationPenalty = wouldRepeatPacStep(x, y) ? (currentGhostCount === 1 ? 4 : currentGhostCount === 2 ? 12 : 17) : 0;
+      const greedyNoise = Math.random() < (currentGhostCount === 1 ? 0.12 : currentGhostCount === 2 ? 0.06 : 0.03) ? 5 : 0;
+      const escapeBonus = blockedEscape ? evaluateEscapeRoute(x, y) * (currentGhostCount === 1 ? 11 : currentGhostCount === 2 ? 15 : 19) : 0;
       const wormholePenalty = getTeleportThreatPenalty(x, y) * intelligence;
       return {
         option,
